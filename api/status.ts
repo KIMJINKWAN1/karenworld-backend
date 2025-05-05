@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   try {
     const CLAIM_PER_USER = 2000;
-    const MAX_AIRDROP = 20_000_000;
+    const MAX_AIRDROP = 20000000;
 
     const userCount = await getClaimedCount(); // 슬랙 메시지 수
     const remaining = MAX_AIRDROP - CLAIM_PER_USER * userCount;
@@ -15,11 +15,11 @@ export default async function handler(req, res) {
 
 async function getClaimedCount() {
   const response = await fetch(
-    `https://slack.com/api/conversations.history?channel=${process.env.SLACK_CHANNEL_ID}`,
+    `https://slack.com/api/conversations.history?channel=${process.env.SLACK_CHANNEL_ID}&limit=1000`,
     {
       headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`
-      }
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+      },
     }
   );
 
