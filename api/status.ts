@@ -1,13 +1,30 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+export default async function handler(req, res) {
+  try {
+    const CLAIM_PER_USER = 2000;
+    const MAX_AIRDROP = 20_000_000;
 
-let claims: string[] = [];
+    const userCount = await getClaimedCount(); // 슬랙 메시지 수
+    const remaining = MAX_AIRDROP - CLAIM_PER_USER * userCount;
 
-const CLAIM_PER_USER = 2000;
-const MAX_AIRDROP = 20000000;
+    res.status(200).json({ status: "ok", remaining });
+  } catch (e) {
+    console.error("Failed to fetch airdrop status", e);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
-  const totalClaimed = claims.length * CLAIM_PER_USER;
-  const remaining = Math.max(0, MAX_AIRDROP - totalClaimed);
-  const percent = Math.min(100, ((totalClaimed / MAX_AIRDROP) * 100).toFixed(1));
-  res.status(200).json({ totalClaimed, remaining, max: MAX_AIRDROP, percent });
+async function getClaimedCount() {
+  const response = await fetch(
+    `https://slack.com/api/conversations.history?channel=${process.env.SLACK_CHANNEL_ID}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`
+      }
+    }
+  );
+
+  const data = await response.json();
+  if (!data.ok) throw new Error("Slack API failed");
+
+  return data.messages.length;
 }
