@@ -62,22 +62,15 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-// ✅ CORS 설정
+// CORS 허용
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // 또는 특정 origin 지정
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST");
+  res.setHeader("Access-Control-Allow-Origin", "*"); // 또는 프론트 도메인만 허용 가능
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
   next();
-});
-
-app.use(express.json());
-
-app.get("/api/status", (req, res) => {
-  res.json({ status: "ok", claimed: 0, remaining: 20000000, total: 20000000, percent: "0.00" });
-});
-
-app.post("/api/submit", (req, res) => {
-  res.json({ message: "Airdrop claimed", amount: 2000 });
 });
 
 // ✅ Vercel 호환 익스프레스 핸들러
