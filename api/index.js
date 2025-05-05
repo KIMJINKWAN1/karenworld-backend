@@ -2,6 +2,17 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 
+// ✅ CORS 설정 (맨 위에서 처리)
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // 또는 https://karen-world-clean.vercel.app
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
 app.use(express.json());
 
 // ✅ 루트 경로
@@ -62,16 +73,5 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-// CORS 허용
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // 또는 프론트 도메인만 허용 가능
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-});
-
-// ✅ Vercel 호환 익스프레스 핸들러
+// ✅ Vercel 호환 핸들러
 module.exports = (req, res) => app(req, res);
