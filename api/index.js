@@ -10,8 +10,36 @@ app.get("/", (req, res) => {
 });
 
 // ✅ 상태 확인
-app.get("/api/status", (req, res) => {
-  res.json({ status: "ok", remaining: 19960000 });
+app.get("/api/status", async (req, res) => {
+  const CLAIM_PER_USER = 2000;
+  const MAX_AIRDROP = 20000000;
+
+  try {
+    const slackResponse = await fetch(
+      `https://slack.com/api/conversations.history?channel=${process.env.SLACK_CHANNEL_ID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SLACK_TOKEN}`,
+        },
+      }
+    );
+
+    const data = await slackResponse.json();
+    const claimedCount = data.messages?.length || 0;
+    const claimed = claimedCount * CLAIM_PER_USER;
+    const remaining = MAX_AIRDROP - claimed;
+
+    res.json({
+      status: "ok",
+      claimed,
+      remaining,
+      total: MAX_AIRDROP,
+      percent: ((claimed / MAX_AIRDROP) * 100).toFixed(2),
+    });
+  } catch (err) {
+    console.error("❌ Failed to fetch Slack messages:", err);
+    res.status(500).json({ error: "Slack fetch failed" });
+  }
 });
 
 // ✅ 에어드롭 제출 처리
