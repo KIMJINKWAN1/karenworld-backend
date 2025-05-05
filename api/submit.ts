@@ -8,8 +8,11 @@ const MAX_AIRDROP = 20000000;
 const { SLACK_WEBHOOK } = process.env;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { address } = req.body;
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
+  const { address } = req.body;
   if (!address || !address.startsWith('0x')) {
     return res.status(400).json({ error: 'Invalid address' });
   }
