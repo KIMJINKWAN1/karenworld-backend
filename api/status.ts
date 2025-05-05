@@ -23,13 +23,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   claimedWallets.add(wallet);
 
   try {
-    await fetch(process.env.SLACK_WEBHOOK!, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
-  }),
-});
+    const payload = {
+      // ✅ Slack Webhook에서 허용하는 기본 형식
+      text: `🎉 *New Airdrop Claim!* \n\n💼 Wallet: \`${wallet}\`\n💰 Amount: *${CLAIM_PER_USER} $KAREN*`
+    };
+
+    const response = await fetch(process.env.SLACK_WEBHOOK!, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Slack responded with ${response.status}`);
+    }
 
     return res.status(200).json({ message: "Airdrop claimed", amount: CLAIM_PER_USER });
   } catch (error) {
