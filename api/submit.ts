@@ -1,6 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import fetch from 'node-fetch';
 
 const CLAIM_PER_USER = 2000;
 const MAX_AIRDROP = 20000000;
@@ -25,34 +23,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   claimedWallets.add(wallet);
 
   try {
-    const slackBotToken = process.env.SLACK_BOT_TOKEN;
-    const slackChannelId = process.env.SLACK_CHANNEL_ID;
-
-    if (!slackBotToken || !slackChannelId) {
-      throw new Error("Missing Slack credentials");
-    }
-
     const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${slackBotToken}`,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
       },
       body: JSON.stringify({
-        channel: slackChannelId,
-        text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
+        channel: process.env.SLACK_CHANNEL_ID,
+        text: `🎉 New Airdrop Claim!\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
       }),
     });
 
-    const slackData = await slackRes.json();
-
-    if (!slackData.ok) {
-      throw new Error(`Slack API Error: ${slackData.error}`);
+    const result = await slackRes.json();
+    if (!result.ok) {
+      console.error("❌ Slack API error:", result);
+      throw new Error("Slack failed");
     }
 
     return res.status(200).json({ message: "Airdrop claimed", amount: CLAIM_PER_USER });
-  } catch (error: any) {
-    console.error("Slack send error:", error);
-    return res.status(500).json({ error: "Slack failed" });
+  } catch (err: any) {
+    console.error("❌ Submit handler error:", err);
+    return res.status(500).json({ error: err.message || "Internal Server Error" });
   }
 }
