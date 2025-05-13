@@ -55,16 +55,17 @@ app.get("/api/status", async (req, res) => {
 
 // ✅ 에어드롭 제출 처리
 app.post("/api/submit", async (req, res) => {
-  const { address } = req.body;
-  if (!address) return res.status(400).json({ error: "Missing address" });
+  console.log("📥 Request body:", req.body);
+  const { wallet } = req.body;  // ✅ 여기를 수정!
+  if (!wallet) return res.status(400).json({ error: "Missing wallet" });
 
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   try {
-    await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: `📥 Airdrop submitted: ${address}` }),
-    });
+await fetch(process.env.SLACK_WEBHOOK_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ text: `📥 Airdrop submitted: ${wallet}` }),
+});
 
     return res.json({ success: true });
   } catch (err) {
