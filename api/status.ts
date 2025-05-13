@@ -1,46 +1,49 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import fetch from 'node-fetch';
 
 const CLAIM_PER_USER = 2000;
 const MAX_AIRDROP = 20000000;
 
-const claimedWallets = new Set<string>();
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") {
+  if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { wallet } = req.body;
+  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
+  const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 
-  if (!wallet || typeof wallet !== "string") {
-    return res.status(400).json({ error: "Invalid wallet address" });
+  if (!SLACK_CHANNEL_ID || !SLACK_BOT_TOKEN) {
+    return res.status(500).json({ error: "Missing Slack credentials" });
   }
-
-  if (claimedWallets.has(wallet)) {
-    return res.status(400).json({ error: "Already claimed" });
-  }
-
-  claimedWallets.add(wallet);
 
   try {
-    const payload = {
-      // ✅ Slack Webhook에서 허용하는 기본 형식
-      text: `🎉 *New Airdrop Claim!* \n\n💼 Wallet: \`${wallet}\`\n💰 Amount: *${CLAIM_PER_USER} $KAREN*`
-    };
-
-    const response = await fetch(process.env.SLACK_WEBHOOK!, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    // Slack API에서 메시지 수를 가져옴
+    const response = await fetch(`https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}`, {
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
     });
 
-    if (!response.ok) {
-      throw new Error(`Slack responded with ${response.status}`);
+    const data = await response.json();
+
+    if (!data.ok) {
+      throw new Error(data.error || "Slack API error");
     }
 
-    return res.status(200).json({ message: "Airdrop claimed", amount: CLAIM_PER_USER });
+    const messageCount = data.messages?.length || 0;
+    const claimed = messageCount * CLAIM_PER_USER;
+    const remaining = MAX_AIRDROP - claimed;
+
+    return res.status(200).json({
+      status: "ok",
+      claimed,
+      remaining,
+      total: MAX_AIRDROP,
+      percent: ((claimed / MAX_AIRDROP) * 100).toFixed(2),
+    });
+
   } catch (error) {
-    console.error("❌ Slack Webhook error:", error);
-    return res.status(500).json({ error: "Failed to send Slack message" });
+    console.error("Slack fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch from Slack" });
   }
 }
