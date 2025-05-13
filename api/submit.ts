@@ -41,15 +41,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${slackToken}`,
-      },
-      body: JSON.stringify({
-        channel: slackChannel,
-        text: `🎉 New airdrop claim!\n\nWallet: \`${wallet}\`\nAmount: ${CLAIM_PER_USER} $KAREN`,
-      }),
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+  },
+  body: JSON.stringify({
+    channel: process.env.SLACK_CHANNEL_ID,
+    text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
+  }),
+});
     });
 
     const slackData = await slackRes.json();
