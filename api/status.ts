@@ -2,48 +2,61 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 
 const CLAIM_PER_USER = 2000;
-const MAX_AIRDROP = 20000000;
+const MAX_SUPPLY = 20000000;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
   const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 
-  if (!SLACK_CHANNEL_ID || !SLACK_BOT_TOKEN) {
-    return res.status(500).json({ error: "Missing Slack credentials" });
+  if (!SLACK_BOT_TOKEN || !SLACK_CHANNEL_ID) {
+    return res.status(500).json({ error: "Slack environment variables are missing" });
   }
 
   try {
-    // Slack API에서 메시지 수를 가져옴
-    const response = await fetch(`https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}`, {
-      headers: {
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-    });
+    // Slack 메시지 조회
+    const slackHistoryRes = await fetch(
+      `https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        },
+      }
+    );
 
-    const data = await response.json();
+    const history = await slackHistoryRes.json();
 
-    if (!data.ok) {
-      throw new Error(data.error || "Slack API error");
+    if (!history.ok) {
+      console.error("Slack history error:", history.error);
+      return res.status(500).json({ error: "Slack history fetch failed" });
     }
 
-    const messageCount = data.messages?.length || 0;
-    const claimed = messageCount * CLAIM_PER_USER;
-    const remaining = MAX_AIRDROP - claimed;
+    const claimMessages = history.messages?.filter((msg: any) =>
+      msg.text?.includes("🎉 New Airdrop Claim!")
+    ) || [];
+
+    const claimed = claimMessages.length * CLAIM_PER_USER;
+    const remaining = MAX_SUPPLY - claimed;
+    const percent = ((claimed / MAX_SUPPLY) * 100).toFixed(2);
+
+    const wallet = req.query.wallet as string;
+    let claimedByWallet = false;
+
+    if (wallet) {
+      claimedByWallet = claimMessages.some((msg: any) =>
+        msg.text?.includes(wallet)
+      );
+    }
 
     return res.status(200).json({
       status: "ok",
+      total: MAX_SUPPLY,
       claimed,
       remaining,
-      total: MAX_AIRDROP,
-      percent: ((claimed / MAX_AIRDROP) * 100).toFixed(2),
+      percent,
+      ...(wallet && { claimedByWallet }),
     });
-
-  } catch (error) {
-    console.error("Slack fetch error:", error);
-    return res.status(500).json({ error: "Failed to fetch from Slack" });
+  } catch (err) {
+    console.error("Slack fetch error:", err);
+    return res.status(500).json({ error: "Slack fetch error" });
   }
 }
