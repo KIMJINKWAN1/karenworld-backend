@@ -2,9 +2,9 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 
-// ✅ CORS 설정 (맨 위에서 처리)
+// ✅ CORS configuration
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // 또는 https://karen-world-clean.vercel.app
+  res.setHeader("Access-Control-Allow-Origin", "*"); // Or specify your frontend URL
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
@@ -15,29 +15,37 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// ✅ 루트 경로
+// ✅ Root endpoint
 app.get("/", (req, res) => {
   res.send("Karen World Backend is running 🛠️");
 });
 
-// ✅ 상태 확인
+// ✅ Airdrop status API
 app.get("/api/status", async (req, res) => {
   const CLAIM_PER_USER = 2000;
   const MAX_AIRDROP = 20000000;
 
+  const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
+
+  if (!SLACK_BOT_TOKEN || !SLACK_CHANNEL_ID) {
+    return res.status(500).json({ error: "Slack configuration missing" });
+  }
+
   try {
     const slackResponse = await fetch(
-      `https://slack.com/api/conversations.history?channel=${process.env.SLACK_CHANNEL_ID}`,
+      `https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.SLACK_TOKEN}`,
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
         },
       }
     );
-
     const data = await slackResponse.json();
-    const claimedCount = data.messages?.length || 0;
-    const claimed = claimedCount * CLAIM_PER_USER;
+    if (!data.ok) throw new Error(data.error || "Slack API error");
+
+    const count = data.messages?.length || 0;
+    const claimed = count * CLAIM_PER_USER;
     const remaining = MAX_AIRDROP - claimed;
 
     res.json({
@@ -53,26 +61,44 @@ app.get("/api/status", async (req, res) => {
   }
 });
 
-// ✅ 에어드롭 제출 처리
+// ✅ Airdrop submit API
 app.post("/api/submit", async (req, res) => {
-  console.log("📥 Request body:", req.body);
-  const { wallet } = req.body;  // ✅ 여기를 수정!
-  if (!wallet) return res.status(400).json({ error: "Missing wallet" });
+  const { wallet } = req.body;
+  if (!wallet) return res.status(400).json({ error: "Missing wallet address" });
 
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
+  const slackUrl = process.env.SLACK_API_URL || "https://slack.com/api/chat.postMessage";
+
+  if (!SLACK_BOT_TOKEN || !SLACK_CHANNEL_ID) {
+    return res.status(500).json({ error: "Slack configuration missing" });
+  }
+
   try {
-await fetch(process.env.SLACK_WEBHOOK_URL, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ text: `📥 Airdrop submitted: ${wallet}` }),
-});
+    const slackResponse = await fetch(slackUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: SLACK_CHANNEL_ID,
+        text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: 2000 $KAREN`,
+      }),
+    });
 
-    return res.json({ success: true });
+    const result = await slackResponse.json();
+    if (!result.ok) {
+      console.error("❌ Slack message error:", result.error);
+      return res.status(500).json({ error: "Slack message failed" });
+    }
+
+    res.json({ success: true });
   } catch (err) {
-    console.error("Slack send error:", err);
-    return res.status(500).json({ error: "Slack failed" });
+    console.error("❌ Slack send error:", err);
+    res.status(500).json({ error: "Slack failed" });
   }
 });
 
-// ✅ Vercel 호환 핸들러
+// ✅ Export for Vercel compatibility
 module.exports = (req, res) => app(req, res);
