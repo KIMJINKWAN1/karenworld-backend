@@ -26,24 +26,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log("SLACK_CHANNEL_ID:", process.env.SLACK_CHANNEL_ID);
 
   try {
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        channel: process.env.SLACK_CHANNEL_ID,
-        text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
-      }),
-    });
+const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    channel: process.env.SLACK_CHANNEL_ID,
+    text: `🎉 New Airdrop Claim!\n\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
+  }),
+});
 
-    const slackData = await slackRes.json();
-
-    if (!slackData.ok) {
-      console.error("Slack send error:", slackData.error);
-      return res.status(500).json({ error: "Slack failed" });
-    }
+const result = await slackRes.json();
+if (!result.ok) {
+  console.error("Slack API error:", result.error);
+  return res.status(500).json({ error: "Slack failed" });
+}
   } catch (error) {
     console.error("Slack send error:", error);
     return res.status(500).json({ error: "Slack failed" });
