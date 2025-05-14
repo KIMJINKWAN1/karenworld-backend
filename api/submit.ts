@@ -60,6 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Already claimed' });
     }
 
+    const hasClaimed = await checkIfAlreadyClaimed(wallet);
+if (hasClaimed) {
+  return res.status(400).json({ error: "Already claimed" });
+}
+
     // 4️⃣ Slack 메시지 전송
     const slackRes = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
