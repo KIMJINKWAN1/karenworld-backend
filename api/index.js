@@ -117,5 +117,5 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-// ✅ Vercel에서 이 함수로 export
+// ✅ Vercel 서버리스 함수 export
 module.exports = (req, res) => app(req, res);
