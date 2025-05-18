@@ -21,7 +21,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 1️⃣ 중복 수령 방지
     const historyRes = await fetch(`https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL_ID}`, {
       headers: {
         Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
@@ -37,13 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Wallet already claimed' });
     }
 
-    // 2️⃣ 최대 수량 초과 방지
     const claimed = messages.length * CLAIM_PER_USER;
     if (claimed + CLAIM_PER_USER > MAX_AIRDROP) {
       return res.status(400).json({ error: 'Airdrop cap reached' });
     }
 
-    // 3️⃣ Slack 메시지 전송
     const postRes = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
