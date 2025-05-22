@@ -1,54 +1,46 @@
-import { SuiClient, getFullnodeUrl, TransactionBlock } from "@mysten/sui.js/client";
+import { NextApiRequest, NextApiResponse } from "next";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
-import { fromB64 } from "@mysten/sui.js/utils";
-import { Firestore } from "firebase-admin/firestore";
-import type { NextApiRequest, NextApiResponse } from "next";
-import fetch from "node-fetch";
+import { fromB64 } from "@mysten/bcs";
+import { adminDb } from "../../firebase/admin";
+import { sendSlackNotification } from "../../utils/slack";
+
+const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN in raw (decimals = 9)
+const COLLECTION_PATH = "airdrop/claims/claims";
 
 const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
 
-const keypair = Ed25519Keypair.fromSecretKey(fromB64(process.env.PRIVATE_KEY as string));
-const COIN_OBJECT_ID = process.env.AIRDROP_COIN_ID!;
-const CLAIM_PER_USER = 2000;
-const MAX_AIRDROP = 20000000;
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return res.status(405).end();
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
 
-  const db = new Firestore();
   const { wallet } = req.body;
-
-  if (!wallet || !/^0x[a-fA-F0-9]{40,64}$/.test(wallet)) {
+  if (!wallet || typeof wallet !== "string") {
     return res.status(400).json({ error: "Invalid wallet address" });
   }
 
-  const docRef = db.collection("claims").doc(wallet);
+  const docRef = adminDb.collection(COLLECTION_PATH).doc(wallet);
   const doc = await docRef.get();
 
   if (doc.exists) {
-    return res.status(409).json({ error: "This wallet already claimed the airdrop." });
+    return res.status(400).json({ error: "This wallet already claimed the airdrop." });
   }
-
-  const snapshot = await db.collection("claims").get();
-  const claimedAmount = snapshot.size * CLAIM_PER_USER;
-
-  if (claimedAmount + CLAIM_PER_USER > MAX_AIRDROP) {
-    return res.status(400).json({ error: "Airdrop limit exceeded" });
-  }
-
-  const tx = new TransactionBlock();
-  const coin = tx.splitCoins(tx.object(COIN_OBJECT_ID), [tx.pure(CLAIM_PER_USER)]);
-  tx.transferObjects([coin], tx.pure(wallet));
 
   try {
-    const result = await sui.signAndExecuteTransactionBlock({
+    const keypair = Ed25519Keypair.fromSecretKey(fromB64(process.env.PRIVATE_KEY!));
+    const result = await sui.pay({
       signer: keypair,
-      transactionBlock: tx,
+      inputCoins: [process.env.AIR_DROP_COIN_ID!],
+      recipients: [wallet],
+      amounts: [CLAIM_PER_USER],
       options: { showEffects: true },
     });
 
-    if (result.effects?.status.status !== "success") {
-      return res.status(500).json({ error: "Airdrop transfer failed" });
+    const status = result.effects?.status?.status;
+    if (status !== "success") {
+      console.error("❌ SUI Tx Failed:", result.effects?.status?.error ?? "Unknown error");
+      return res.status(500).json({ error: "SUI transaction failed", detail: result.effects?.status?.error });
     }
 
     await docRef.set({
@@ -58,27 +50,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sentAt: new Date(),
     });
 
-    // ✅ 슬랙 알림 전송
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        channel: process.env.SLACK_CHANNEL_ID,
-        text: `🎉 *New Airdrop Sent!*\n• Wallet: \`${wallet}\`\n• Amount: ${CLAIM_PER_USER} $KAREN\n• Tx: https://explorer.sui.io/txblock/${result.digest}?network=mainnet`,
-      }),
-    });
+    await sendSlackNotification(
+      `✅ Airdrop Success\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER}\nTx: ${result.digest}`
+    );
 
-    const slackResult = await slackRes.json();
-    if (!slackResult.ok) {
-      console.error("❌ Slack error:", slackResult.error);
-    }
-
-    return res.status(200).json({ success: true, txId: result.digest });
-  } catch (error) {
-    console.error("❌ Airdrop transfer error:", error);
-    return res.status(500).json({ error: "Airdrop transfer exception" });
+    return res.status(200).json({ success: true, amount: CLAIM_PER_USER });
+  } catch (error: any) {
+    console.error("Airdrop failed:", error);
+    return res.status(500).json({ error: "Internal server error", detail: error.message });
   }
 }
