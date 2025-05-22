@@ -1,75 +1,36 @@
-import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { TransactionBlock } from "@mysten/sui.js/transactions";
-import { getFullnodeUrl, SuiClient } from "@mysten/sui.js/client";
-import { fromB64, Ed25519Keypair } from "@mysten/sui.js/keypairs";
-import { execSync } from "child_process";
-import * as dotenv from "dotenv";
-import key from "../firebase-key.json";
+import { getOrCreateClient } from "./_suiClient";
+import { PRIVATE_KEY, AIRDROP_WALLET_ADDRESS, AIR_DROP_COIN_ID, KAREN_COIN_TYPE } from "./_env";
 
-dotenv.config();
+const CLAIM_PER_USER = 2000;
 
-initializeApp({
-  credential: cert(key as any),
-});
+export async function sendAirdropToWallet(address: string) {
+  const db = getFirestore();
+  const claimsRef = db.collection("airdrop").doc("claims").collection("claims");
+  const docRef = claimsRef.doc(address);
+  const doc = await docRef.get();
 
-const db = getFirestore();
-const claimsRef = db.collection("airdrop").doc("claims").collection("claims");
+  if (doc.exists && doc.data()?.status === "sent") {
+    console.log("⚠️ 이미 전송된 지갑입니다:", address);
+    return;
+  }
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const AIRDROP_COIN_ID = process.env.AIR_DROP_COIN_ID!;
-const COIN_TYPE = process.env.KAREN_COIN_TYPE!;
-const SENDER_ADDRESS = process.env.AIRDROP_WALLET_ADDRESS!;
-const SEND_AMOUNT = Number(process.env.AIRDROP_AMOUNT || 2_000);
-
-const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY).slice(1));
-const suiClient = new SuiClient({ url: getFullnodeUrl("mainnet") });
-
-export async function sendToken(recipient: string): Promise<{ txId: string }> {
-  const tx = new TransactionBlock();
-  const [coin] = tx.splitCoins(tx.object(AIRDROP_COIN_ID), [tx.pure(SEND_AMOUNT)]);
-  tx.transferObjects([coin], tx.pure(recipient));
-  tx.setGasBudget(100_000_000);
-
-  const result = await suiClient.signAndExecuteTransactionBlock({
-    transactionBlock: tx,
-    signer: keypair,
-    options: { showEffects: true },
+  const sui = await getOrCreateClient(PRIVATE_KEY);
+  const tx = await sui.pay({
+    inputCoins: [AIRDROP_COIN_ID],
+    recipients: [address],
+    amounts: [CLAIM_PER_USER],
+    gasBudget: 100000000,
   });
 
-  if (result.effects?.status.status !== "success") {
-    throw new Error("TX Failed");
-  }
+  console.log("✅ 전송 완료:", tx.digest);
 
-  return { txId: result.digest };
-}
+  await docRef.set({
+    status: "sent",
+    txId: tx.digest,
+    amount: CLAIM_PER_USER,
+    sentAt: Timestamp.now(),
+  });
 
-export async function sendAirdropsBatch(addresses: string[]) {
-  for (const address of addresses) {
-    const docRef = claimsRef.doc(address);
-
-    const snapshot = await docRef.get();
-    if (!snapshot.exists) continue;
-
-    const data = snapshot.data();
-    if (data?.status === "sent") {
-      console.log(`🚫 Already sent to ${address}, skipping.`);
-      continue;
-    }
-
-    try {
-      const result = await sendToken(address);
-      console.log("✅ TX sent:", result.txId);
-
-      console.log("Updating Firestore for", address);
-      await docRef.update({
-        status: "sent",
-        txId: result.txId,
-        sentAt: Timestamp.now(),
-      });
-      console.log("✅ Firestore updated for", address);
-    } catch (err) {
-      console.error("❌ Failed to send to", address, err);
-    }
-  }
+  console.log("✅ Firestore 기록 완료:", address);
 }
