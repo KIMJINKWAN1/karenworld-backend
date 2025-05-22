@@ -1,8 +1,8 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "karen-world-backend/firestore";
 import { getOrCreateClient } from "./_suiClient";
 import { PRIVATE_KEY, AIRDROP_WALLET_ADDRESS, AIR_DROP_COIN_ID, KAREN_COIN_TYPE } from "./_env";
 
-const CLAIM_PER_USER = 2000;
+const CLAIM_PER_USER = 2_000_000_000_000;
 
 export async function sendAirdropToWallet(address: string) {
   const db = getFirestore();

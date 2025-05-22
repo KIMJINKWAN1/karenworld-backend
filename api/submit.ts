@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui.js";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { fromB64 } from "@mysten/bcs";
-import { adminDb } from "../firebase/admin";
+import { adminDb } from "../karen-world-backend/firestore";
 import { sendSlackNotification } from "../utils/slack";
 
 const CLAIM_AMOUNT = 2_000_000_000_000; // 2,000 KAREN with 9 decimals
