@@ -3,11 +3,9 @@ const fetch = require("node-fetch");
 const admin = require("firebase-admin");
 const app = express();
 
-// 에어드롭 설정
 const CLAIM_PER_USER = 2_000_000_000_000;
 const MAX_AIRDROP = 10_000_000_000_000;
 
-// Firebase 초기화 (with try-catch for debugging)
 try {
   const serviceAccount = {
     type: process.env.FIREBASE_TYPE,
@@ -23,39 +21,31 @@ try {
   };
 
   if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     console.log("✅ Firebase initialized");
   }
 } catch (err) {
-  console.error("❌ Firebase initialization failed:", err);
+  console.error("❌ Firebase init failed:", err);
 }
 
 const db = admin.firestore();
 const claimsRef = db.collection("claims");
 
-// ✅ CORS 설정
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "https://karen-world-clean.vercel.app");
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
   if (req.method === "OPTIONS") return res.status(200).end();
   next();
 });
 app.use(express.json());
 
-// ✅ 기본 라우트
 app.get("/", (req, res) => {
-  res.send("🛠️ Karen World Backend is live");
+  res.send("✅ Karen World Backend running");
 });
 
-// ✅ 상태 API - 전체 or 단일 지갑
 app.get("/api/status", async (req, res) => {
   const { address } = req.query;
-
   try {
     if (address) {
       const doc = await claimsRef.doc(address).get();
@@ -63,8 +53,7 @@ app.get("/api/status", async (req, res) => {
     }
 
     const snapshot = await claimsRef.get();
-    const count = snapshot.size;
-    const claimed = count * CLAIM_PER_USER;
+    const claimed = snapshot.size * CLAIM_PER_USER;
     const remaining = MAX_AIRDROP - claimed;
 
     return res.json({
@@ -76,48 +65,12 @@ app.get("/api/status", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Status error:", err);
-    return res.status(500).json({ error: "Status check failed" });
+    return res.status(500).json({ error: "Status failed" });
   }
 });
 
-// ✅ 에어드롭 제출 API
-const submitHandler = require("./submit"); // ⬅️ 추가
+const submitHandler = require("./submit");
 
-app.post("/api/submit", async (req, res) => {
-  const { wallet } = req.body;
-  if (!wallet) return res.status(400).json({ error: "Missing wallet address" });
+app.post("/api/submit", submitHandler);
 
-  const { SLACK_BOT_TOKEN, SLACK_CHANNEL_ID } = process.env;
-
-  try {
-    const existing = await claimsRef.doc(wallet).get();
-    if (existing.exists) {
-      return res.status(409).json({ error: "This wallet already claimed the airdrop." });
-    }
-
-    await claimsRef.doc(wallet).set({ timestamp: new Date() });
-
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        channel: SLACK_CHANNEL_ID,
-        text: `🎉 New Airdrop Claim!\nWallet: ${wallet}\nAmount: ${CLAIM_PER_USER} $KAREN`,
-      }),
-    });
-
-    const result = await slackRes.json();
-    if (!result.ok) console.error("❌ Slack error:", result.error);
-
-    return res.json({ success: true, amount: CLAIM_PER_USER });
-  } catch (err) {
-    console.error("❌ Submit error:", err);
-    return res.status(500).json({ error: "Airdrop submission failed" });
-  }
-});
-
-// ✅ Vercel 서버리스 함수 export
 module.exports = (req, res) => app(req, res);

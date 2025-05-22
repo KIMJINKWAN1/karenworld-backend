@@ -1,4 +1,4 @@
-import { getFirestore, Timestamp } from "karen-world-backend/firestore";
+import { getFirestore, Timestamp } from "firebase/admin";
 import { getOrCreateClient } from "./_suiClient";
 import { PRIVATE_KEY, AIRDROP_WALLET_ADDRESS, AIR_DROP_COIN_ID, KAREN_COIN_TYPE } from "./_env";
 
@@ -17,7 +17,7 @@ export async function sendAirdropToWallet(address: string) {
 
   const sui = await getOrCreateClient(PRIVATE_KEY);
   const tx = await sui.pay({
-    inputCoins: [AIRDROP_COIN_ID],
+    inputCoins: [AIR_DROP_COIN_ID],
     recipients: [address],
     amounts: [CLAIM_PER_USER],
     gasBudget: 100000000,
