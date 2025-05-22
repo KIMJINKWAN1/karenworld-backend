@@ -5,7 +5,7 @@ import { Firestore } from "firebase-admin/firestore";
 import type { NextApiRequest, NextApiResponse } from "next";
 import fetch from "node-fetch";
 
-const sui = new SuiClient({ url: getFullnodeUrl("mainnet") });
+const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
 
 const keypair = Ed25519Keypair.fromSecretKey(fromB64(process.env.PRIVATE_KEY as string));
 const COIN_OBJECT_ID = process.env.AIRDROP_COIN_ID!;
