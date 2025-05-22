@@ -4,8 +4,8 @@ const admin = require("firebase-admin");
 const app = express();
 
 // 에어드롭 설정
-const CLAIM_PER_USER = 2000;
-const MAX_AIRDROP = 20000000;
+const CLAIM_PER_USER = 2_000_000_000_000;
+const MAX_AIRDROP = 10_000_000_000_000;
 
 // Firebase 초기화 (with try-catch for debugging)
 try {
@@ -81,6 +81,8 @@ app.get("/api/status", async (req, res) => {
 });
 
 // ✅ 에어드롭 제출 API
+const submitHandler = require("./submit"); // ⬅️ 추가
+
 app.post("/api/submit", async (req, res) => {
   const { wallet } = req.body;
   if (!wallet) return res.status(400).json({ error: "Missing wallet address" });
