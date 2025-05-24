@@ -1,30 +1,30 @@
-export const sendSlackNotification = async (message: string) => {
-  const slackToken = process.env.SLACK_BOT_TOKEN!;
-  const slackChannel = process.env.SLACK_CHANNEL_ID!;
+export async function sendSlackNotification(message: string) {
+  const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+  const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 
-  if (!slackToken || !slackChannel) {
-    console.warn("Slack 토큰 또는 채널 ID가 설정되지 않았습니다.");
+  if (!SLACK_BOT_TOKEN || !SLACK_CHANNEL_ID) {
+    console.warn("❗ Slack environment variables are missing. Unable to send message.");
     return;
   }
 
   try {
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${slackToken}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
       },
       body: JSON.stringify({
-        channel: slackChannel,
+        channel: SLACK_CHANNEL_ID,
         text: message,
       }),
     });
 
-    const data = await res.json();
+    const data = await response.json();
     if (!data.ok) {
-      console.error("Slack 전송 실패:", data.error);
+      console.error("❌ Failed to send Slack message:", data.error);
     }
   } catch (err) {
-    console.error("Slack API 오류:", err);
+    console.error("❌ Exception occurred during Slack request:", err);
   }
-};
+}
