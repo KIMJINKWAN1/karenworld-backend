@@ -1,5 +1,6 @@
-import { getFirestore, Timestamp } from "firebase/admin";
-import { getOrCreateClient } from "./_suiClient";
+import { adminDb } from "../firebase/admin"; // ← 실제 존재하는 경로로 수정 필요
+import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
+import { fromB64 } from "@mysten/bcs";
 import { PRIVATE_KEY, AIRDROP_WALLET_ADDRESS, AIR_DROP_COIN_ID, KAREN_COIN_TYPE } from "./_env";
 
 const CLAIM_PER_USER = 2_000_000_000_000;

@@ -1,10 +1,16 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import fetch from 'node-fetch';
+import { NextApiRequest, NextApiResponse } from "next";
 
-const CLAIM_PER_USER = 2000;
-const MAX_AIRDROP = 20000000;
+const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN = 2e12 (with 9 decimals)
+const MAX_AIRDROP = 20_000_000_000_000_000; // 20,000,000 KAREN = 2e16 (with 9 decimals)
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    return res.status(200).json({ status: "ok" });
+  } catch (e) {
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
   const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
   const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 
