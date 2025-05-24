@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       alreadyClaimed = messages.some((msg: any) => msg.text?.includes(wallet));
     }
 
-    return res.status(200).json({
+    return res.status(200).json({ ... });
       status: 'ok',
       total: MAX_AIRDROP,
       claimed,
