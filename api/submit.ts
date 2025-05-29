@@ -1,17 +1,17 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { SuiClient, getFullnodeUrl, TransactionBlock } from "@mysten/sui.js";
-import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
+import { SuiClient, getFullnodeUrl, SuiTransactionBlock } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { fromB64 } from "@mysten/bcs";
 import { adminDb } from "../firebase/admin";
 import { sendSlackNotification } from "../utils/slack";
 
-const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN in raw (decimals = 9)
-const MAX_AIRDROP = 42_069_000_000_000; // 42,069,000 KAREN (raw)
+const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN (RAW)
+const MAX_AIRDROP = 20_000_000_000_000_000; // 20,000,000 KAREN (RAW)
 const COLLECTION_PATH = "airdrop/claims/claims";
 
 const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
 const keypair = Ed25519Keypair.fromSecretKey(fromB64(process.env.PRIVATE_KEY!));
-const COIN_OBJECT_ID = process.env.AIRDROP_COIN_ID!;
+const KAREN_COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const tx = new TransactionBlock();
     tx.pay({
-      inputCoins: [COIN_OBJECT_ID],
+      inputCoins: [KAREN_COIN_OBJECT_ID],
       recipients: [wallet],
       amounts: [CLAIM_PER_USER],
     });

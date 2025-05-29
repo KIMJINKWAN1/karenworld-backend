@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { adminDb } from "../firebase/admin";
 
-const CLAIM_PER_USER = 2_000_000_000_000;     // 2,000 KAREN in raw
-const MAX_AIRDROP = 42_069_000_000_000;       // 42,069,000 KAREN in raw
+const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN (RAW)
+const MAX_AIRDROP = 20_000_000_000_000_000; // 20,000,000 KAREN (RAW)
 const COLLECTION_PATH = "airdrop/claims/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

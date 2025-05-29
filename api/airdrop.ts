@@ -1,74 +1,66 @@
-import { SuiClient, getFullnodeUrl, TransactionBlock } from "@mysten/sui.js/client";
-import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
-import { fromB64 } from "@mysten/bcs";
-import { adminDb } from "../firebase/admin";
-import { Timestamp } from "firebase-admin/firestore";
-import { sendSlackNotification } from "../utils/slack";
-import type { NextApiRequest, NextApiResponse } from "next";
+import 'dotenv/config';
+import { db } from '../firebase/admin';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
+import { fromB64 } from '@mysten/bcs';
 
-// Constants
-const COLLECTION_PATH = "airdrop/claims/claims";
-const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN with 9 decimals
-const MAX_AIRDROP = 42_069_000_000_000;   // 42,069,000 KAREN total
+const KAREN_COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
+const AMOUNT = 2000;
+const DECIMALS = 9; // 1 Karen = 10^9
 
-const COIN_OBJECT_ID = process.env.AIRDROP_COIN_ID!;
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const PACKAGE_ID = process.env.PACKAGE_ID!;
-const MODULE_NAME = process.env.MODULE_NAME || "karen_airdrop";
+function base64UrlToBase64(base64url: string): string {
+  return base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(base64url.length + (4 - base64url.length % 4) % 4, '=');
+}
 
-const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
-const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
+const rawKey = process.env.PRIVATE_KEY!;
+const secret = fromB64(base64UrlToBase64(rawKey));
+const keypair = Ed25519Keypair.fromSecretKey(secret.slice(1));
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
+const client = new SuiClient({ url: getFullnodeUrl('testnet') });
 
-  const { wallet } = req.body;
-  if (!wallet || typeof wallet !== "string" || !/^0x[0-9a-fA-F]{40,64}$/.test(wallet)) {
-    return res.status(400).json({ error: "Invalid wallet address" });
-  }
+async function main() {
+  const snapshot = await db.collection('airdrop').get();
+  const unclaimed = snapshot.docs.filter(doc => doc.data().claimed !== true);
 
-  const docRef = adminDb.collection(COLLECTION_PATH).doc(wallet);
-  const docSnap = await docRef.get();
-  if (docSnap.exists) {
-    return res.status(400).json({ error: "Airdrop already claimed" });
-  }
+  for (const doc of unclaimed) {
+    const address = doc.id;
+    console.log(`🚀 Sending airdrop to ${address}`);
 
-  try {
-    const tx = new TransactionBlock();
-    tx.moveCall({
-      target: `${PACKAGE_ID}::${MODULE_NAME}::claim_airdrop`,
-      arguments: [
-        tx.object(COIN_OBJECT_ID),
-        tx.pure(wallet),
-      ],
-    });
+    const tx = new Transaction();
+    tx.setSender(keypair.getPublicKey().toSuiAddress());
 
-    const result = await sui.signAndExecuteTransactionBlock({
-      signer: keypair,
+    const coins = await client.getOwnedObjects({ owner: tx.sender });
+    const gas = coins.data.find(obj => obj.data?.type?.includes('sui::SUI'));
+
+    if (!gas) throw new Error('No gas object found');
+
+    tx.setGasPayment([{
+      objectId: gas.data!.objectId,
+      version: gas.data!.version.toString(),
+      digest: gas.data!.digest,
+    }]);
+
+    tx.setGasBudget(10_000_000);
+
+    const [splitCoin] = tx.splitCoins(KAREN_COIN_OBJECT_ID, [tx.pure.u64(AMOUNT * 10 ** DECIMALS)]);
+    tx.transferObjects([splitCoin], tx.pure.address(address));
+
+    const result = await client.signAndExecuteTransactionBlock({
       transactionBlock: tx,
+      signer: keypair,
       options: { showEffects: true },
     });
 
-    const success = result.effects?.status.status === "success";
-    if (!success) {
-      return res.status(500).json({ error: "Airdrop transaction failed" });
-    }
+    const txHash = result.digest;
+    console.log(`✅ Sent to ${address}, txHash: ${txHash}`);
 
-    const digest = result.digest;
-
-    await docRef.set({
-      wallet,
-      claimedAt: Timestamp.now(),
-      txDigest: digest,
+    await db.collection('airdrop').doc(address).update({
+      claimed: true,
+      txHash,
+      claimedAt: new Date().toISOString(),
     });
-
-    await sendSlackNotification(`🎉 Airdrop claimed by ${wallet}\n🔗 Tx: https://suiexplorer.com/txblock/${digest}?network=testnet`);
-
-    return res.status(200).json({ success: true, amount: CLAIM_PER_USER, digest });
-  } catch (err) {
-    console.error("❌ Airdrop error:", err);
-    return res.status(500).json({ error: "Failed to process airdrop" });
   }
 }
+
+main().catch(console.error);
