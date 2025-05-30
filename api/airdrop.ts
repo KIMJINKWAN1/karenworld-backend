@@ -1,65 +1,96 @@
-import 'dotenv/config';
-import { db } from '../firebase/admin';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { Transaction } from '@mysten/sui/transactions';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { fromB64 } from '@mysten/bcs';
+import { Ed25519Keypair } from '@mysten/sui/cryptography';
+import { getFullnodeUrl, SuiClient, TransactionBlock } from '@mysten/sui/client';
+import dotenv from 'dotenv';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import serviceAccount from '../../firebase-key.json';
+import fetch from 'node-fetch';
 
-const KAREN_COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
-const AMOUNT = 2000;
-const DECIMALS = 9; // 1 Karen = 10^9
+dotenv.config();
 
-function base64UrlToBase64(base64url: string): string {
-  return base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(base64url.length + (4 - base64url.length % 4) % 4, '=');
+if (!getApps().length) {
+  initializeApp({
+    credential: cert(serviceAccount as any),
+  });
+}
+const db = getFirestore();
+const suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
+
+// 슬랙 알림 전송 함수
+async function sendSlackAlert(address: string, digest: string) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const text = `🎁 *Airdrop Completed!*\n📥 To: \`${address}\`\n🔗 Tx: https://suiexplorer.com/txblock/${digest}?network=testnet`;
+  await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
 }
 
-const rawKey = process.env.PRIVATE_KEY!;
-const secret = fromB64(base64UrlToBase64(rawKey));
-const keypair = Ed25519Keypair.fromSecretKey(secret.slice(1));
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { address } = req.query;
+  const recipient = typeof address === 'string' ? address : null;
 
-const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+  const {
+    PRIVATE_KEY,
+    AIRDROP_WALLET_ADDRESS,
+    KAREN_COIN_OBJECT_ID,
+    KAREN_COIN_TYPE,
+  } = process.env;
 
-async function main() {
-  const snapshot = await db.collection('airdrop').get();
-  const unclaimed = snapshot.docs.filter(doc => doc.data().claimed !== true);
+  if (!PRIVATE_KEY || !recipient || !KAREN_COIN_OBJECT_ID || !KAREN_COIN_TYPE) {
+    return res.status(400).json({ error: 'Missing required env or address query' });
+  }
 
-  for (const doc of unclaimed) {
-    const address = doc.id;
-    console.log(`🚀 Sending airdrop to ${address}`);
+  try {
+    // 중복 수령 방지
+    const claimRef = db
+      .collection('airdrop')
+      .doc('claims')
+      .collection('claims')
+      .doc(recipient);
 
-    const tx = new Transaction();
-    tx.setSender(keypair.getPublicKey().toSuiAddress());
+    const doc = await claimRef.get();
+    if (doc.exists) {
+      return res.status(200).json({ status: 'already_claimed' });
+    }
 
-    const coins = await client.getOwnedObjects({ owner: tx.sender });
-    const gas = coins.data.find(obj => obj.data?.type?.includes('sui::SUI'));
+    // 트랜잭션 구성
+    const secretKey = fromB64(PRIVATE_KEY);
+    const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+    const tx = new TransactionBlock();
 
-    if (!gas) throw new Error('No gas object found');
+    tx.transferObjects([tx.object(KAREN_COIN_OBJECT_ID)], tx.pure.address(recipient));
 
-    tx.setGasPayment([{
-      objectId: gas.data!.objectId,
-      version: gas.data!.version.toString(),
-      digest: gas.data!.digest,
-    }]);
-
-    tx.setGasBudget(10_000_000);
-
-    const [splitCoin] = tx.splitCoins(KAREN_COIN_OBJECT_ID, [tx.pure.u64(AMOUNT * 10 ** DECIMALS)]);
-    tx.transferObjects([splitCoin], tx.pure.address(address));
-
-    const result = await client.signAndExecuteTransactionBlock({
-      transactionBlock: tx,
+    const result = await suiClient.signAndExecuteTransactionBlock({
       signer: keypair,
-      options: { showEffects: true },
+      transactionBlock: tx,
+      options: {
+        showEffects: true,
+        showObjectChanges: true,
+      },
     });
 
-    const txHash = result.digest;
-    console.log(`✅ Sent to ${address}, txHash: ${txHash}`);
+    const digest = result.digest;
 
-    await db.collection('airdrop').doc(address).update({
-      claimed: true,
-      txHash,
-      claimedAt: new Date().toISOString(),
+    // DB 기록
+    await claimRef.set({
+      txHash: digest,
+      sender: AIRDROP_WALLET_ADDRESS,
+      timestamp: Date.now(),
     });
+
+    // 슬랙 알림
+    await sendSlackAlert(recipient, digest);
+
+    return res.status(200).json({ status: 'success', txHash: digest });
+  } catch (err: any) {
+    console.error('❌ Airdrop error:', err);
+    return res.status(500).json({ status: 'error', message: err.message });
   }
 }
 
