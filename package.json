@@ -1,15 +1,22 @@
 {
   "name": "karenworld-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "api/index.ts",
   "license": "MIT",
   "engines": {
     "node": "18.x"
   },
+  "scripts": {
+    "postinstall": "patch-package"
+  },
   "dependencies": {
     "@mysten/bcs": "^1.6.1",
-    "@mysten/sui.js": "^0.54.1",
+    "@mysten/sui": "^1.30.1",
+    "@noble/hashes": "^1.8.0",
     "@vercel/node": "^5.1.16",
+    "bech32": "^1.1.4",
+    "dotenv": "^16.5.0",
     "express": "^4.18.2",
     "firebase-admin": "^13.4.0",
     "next": "^15.3.2",
@@ -18,6 +25,9 @@
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/node-fetch": "^2.6.12",
+    "patch-package": "^8.0.0",
+    "postinstall-postinstall": "^2.1.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
 }

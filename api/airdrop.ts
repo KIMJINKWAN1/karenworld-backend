@@ -1,97 +1,63 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { fromB64 } from '@mysten/bcs';
-import { Ed25519Keypair } from '@mysten/sui/cryptography';
-import { getFullnodeUrl, SuiClient, TransactionBlock } from '@mysten/sui/client';
-import dotenv from 'dotenv';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import serviceAccount from '../../firebase-key.json';
-import fetch from 'node-fetch';
+import type { NextApiRequest, NextApiResponse } from "next";
+import { SuiClient, getFullnodeUrl, SuiTransactionBlock } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { fromB64 } from "@mysten/bcs";
+import { adminDb } from "../firebase/admin";
+import { sendSlackNotification } from "../utils/slack";
 
-dotenv.config();
-
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(serviceAccount as any),
-  });
-}
-const db = getFirestore();
-const suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
-
-// 슬랙 알림 전송 함수
-async function sendSlackAlert(address: string, digest: string) {
-  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-  if (!webhookUrl) return;
-
-  const text = `🎁 *Airdrop Completed!*\n📥 To: \`${address}\`\n🔗 Tx: https://suiexplorer.com/txblock/${digest}?network=testnet`;
-  await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
-}
+const CLAIM_PER_USER = 2_000_000_000_000;
+const COLLECTION_PATH = "airdrop/claims/claims";
+const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
+const keypair = Ed25519Keypair.fromSecretKey(fromB64(process.env.PRIVATE_KEY!));
+const KAREN_COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { address } = req.query;
-  const recipient = typeof address === 'string' ? address : null;
+  // ✅ CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  const {
-    PRIVATE_KEY,
-    AIRDROP_WALLET_ADDRESS,
-    KAREN_COIN_OBJECT_ID,
-    KAREN_COIN_TYPE,
-  } = process.env;
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
-  if (!PRIVATE_KEY || !recipient || !KAREN_COIN_OBJECT_ID || !KAREN_COIN_TYPE) {
-    return res.status(400).json({ error: 'Missing required env or address query' });
+  const { wallet } = req.body;
+  if (!wallet || typeof wallet !== "string" || !wallet.startsWith("0x")) {
+    return res.status(400).json({ error: "Invalid wallet address" });
   }
+
+  const docRef = adminDb.collection(COLLECTION_PATH).doc(wallet);
+  const existing = await docRef.get();
+  if (existing.exists) return res.status(400).json({ error: "Already claimed" });
 
   try {
-    // 중복 수령 방지
-    const claimRef = db
-      .collection('airdrop')
-      .doc('claims')
-      .collection('claims')
-      .doc(recipient);
+    const tx = new SuiTransactionBlock();
+    tx.pay({
+      inputCoins: [KAREN_COIN_OBJECT_ID],
+      recipients: [wallet],
+      amounts: [CLAIM_PER_USER],
+    });
 
-    const doc = await claimRef.get();
-    if (doc.exists) {
-      return res.status(200).json({ status: 'already_claimed' });
+    const result = await sui.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
+      signer: keypair,
+    });
+
+    const status = result.effects?.status?.status;
+    if (status !== "success") {
+      console.error("❌ Transaction failed:", result.effects?.status);
+      return res.status(500).json({ error: "Transaction failed" });
     }
 
-    // 트랜잭션 구성
-    const secretKey = fromB64(PRIVATE_KEY);
-    const keypair = Ed25519Keypair.fromSecretKey(secretKey);
-    const tx = new TransactionBlock();
+    await docRef.set({ wallet, timestamp: Date.now() });
+    await sendSlackNotification(`🎉 Airdrop sent to ${wallet}`);
 
-    tx.transferObjects([tx.object(KAREN_COIN_OBJECT_ID)], tx.pure.address(recipient));
-
-    const result = await suiClient.signAndExecuteTransactionBlock({
-      signer: keypair,
-      transactionBlock: tx,
-      options: {
-        showEffects: true,
-        showObjectChanges: true,
-      },
+    return res.status(200).json({
+      success: true,
+      digest: result.digest,
+      amount: CLAIM_PER_USER / 1_000_000_000,
     });
-
-    const digest = result.digest;
-
-    // DB 기록
-    await claimRef.set({
-      txHash: digest,
-      sender: AIRDROP_WALLET_ADDRESS,
-      timestamp: Date.now(),
-    });
-
-    // 슬랙 알림
-    await sendSlackAlert(recipient, digest);
-
-    return res.status(200).json({ status: 'success', txHash: digest });
-  } catch (err: any) {
-    console.error('❌ Airdrop error:', err);
-    return res.status(500).json({ status: 'error', message: err.message });
+  } catch (err) {
+    console.error("❌ Error during airdrop:", err);
+    return res.status(500).json({ error: "Airdrop failed" });
   }
 }
-
-main().catch(console.error);

@@ -1,6 +1,13 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { adminDb } from "../firebase/admin";
 
+res.setHeader("Access-Control-Allow-Origin", "*");
+res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+if (req.method === "OPTIONS") {
+  return res.status(200).end();
+}
+
 const CLAIM_PER_USER = 2_000_000_000_000; // 2,000 KAREN (RAW)
 const MAX_AIRDROP = 20_000_000_000_000_000; // 20,000,000 KAREN (RAW)
 const COLLECTION_PATH = "airdrop/claims/claims";
