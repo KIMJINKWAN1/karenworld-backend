@@ -7,7 +7,7 @@ export function handleCors(req: NextApiRequest, res: NextApiResponse): boolean {
 
   if (req.method === "OPTIONS") {
     res.status(200).end();
-    return true; // early return
+    return true;
   }
   return false;
 }

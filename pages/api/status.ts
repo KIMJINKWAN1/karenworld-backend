@@ -7,6 +7,7 @@ const MAX_AIRDROP = 20_000_000_000_000_000;
 const COLLECTION_PATH = "airdrop/claims/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // ✅ CORS 처리
   if (handleCors(req, res)) return;
 
   if (req.method !== "GET") {
@@ -59,3 +60,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Status check failed" });
   }
 }
+
