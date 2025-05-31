@@ -1,18 +1,23 @@
 import admin from 'firebase-admin';
-import serviceAccount from './firebase-key.json';
+
+const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+if (!rawKey) {
+  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT_KEY is missing in .env");
+}
+
+const serviceAccount = JSON.parse(rawKey);
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+    credential: admin.credential.cert(serviceAccount),
   });
 }
 
 export const adminDb = admin.firestore();
+export const db = adminDb;
 
 /**
  * 에어드랍 대상자 등록
- * @param address 수령자 지갑 주소 (string)
- * @param amount 에어드랍 토큰 수량 (number)
  */
 export async function addRecipient(address: string, amount: number) {
   const ref = db.collection('airdrop').doc('recipients').collection('list').doc(address);
@@ -29,8 +34,6 @@ export async function addRecipient(address: string, amount: number) {
 
 /**
  * 수령 여부 조회
- * @param address 수령자 지갑 주소
- * @returns claimed 여부 (boolean) 또는 null (없을 경우)
  */
 export async function checkRecipientClaimStatus(address: string): Promise<boolean | null> {
   const ref = db.collection('airdrop').doc('recipients').collection('list').doc(address);
@@ -46,10 +49,7 @@ export async function checkRecipientClaimStatus(address: string): Promise<boolea
 }
 
 /**
- * 에어드랍 수령 처리 및 트랜잭션 로그 기록
- * @param address 수령자 지갑 주소
- * @param txHash 트랜잭션 해시
- * @param amount 전송 토큰 수량
+ * 수령 처리 및 트랜잭션 로그 기록
  */
 export async function markClaimed(address: string, txHash: string, amount: number) {
   const recipientRef = db.collection('airdrop').doc('recipients').collection('list').doc(address);
@@ -74,8 +74,7 @@ export async function markClaimed(address: string, txHash: string, amount: numbe
 }
 
 /**
- * 아직 수령하지 않은 대상자 목록 조회
- * @returns 수령 안 한 수령자 주소 배열
+ * 수령 안 한 대상자 목록 조회
  */
 export async function listUnclaimedRecipients(): Promise<string[]> {
   const querySnapshot = await db.collection('airdrop').doc('recipients').collection('list')
@@ -87,4 +86,5 @@ export async function listUnclaimedRecipients(): Promise<string[]> {
   return addresses;
 }
 
-export { db };
+
+

@@ -14,6 +14,7 @@ export async function logAirdropEvent({
 }) {
   const timestamp = Date.now();
 
+  // Firestore 저장
   await adminDb.collection("airdrop/logs").add({
     wallet,
     status,
@@ -22,13 +23,22 @@ export async function logAirdropEvent({
     timestamp,
   });
 
-  const time = new Date(timestamp).toISOString();
+  // Slack 메시지 구성
+  const time = new Date(timestamp).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+
+  const explorerLink = digest
+    ? `<https://suiexplorer.io/txblock/${digest}?network=testnet|🔗 View on Explorer>`
+    : "";
+
+  const trimmedError = error ? error.slice(0, 200) : "";
+
   const message =
     status === "success"
-      ? `🎯 *Airdrop Success*\n• 🧾 Wallet: \`${wallet}\`\n• 🔗 Tx: \`${digest}\`\n• 🕒 ${time}`
-      : `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${wallet}\`\n• 💥 Error: \`${error}\`\n• 🕒 ${time}`;
+      ? `🎉 *AIRDROP SUCCESS*\n\n🧾 *Wallet:* \`${wallet}\`\n${explorerLink}\n🕒 *Time:* ${time}`
+      : `💥 *AIRDROP FAILED*\n\n🧾 *Wallet:* \`${wallet}\`\n⚠️ *Error:* \`${trimmedError}\`\n🕒 *Time:* ${time}`;
 
   await sendSlackNotification(message);
-  console.log(`[${status.toUpperCase()}] ${wallet}`, digest || error);
+  console.log(`[${status.toUpperCase()}] ${wallet}`, digest || trimmedError);
 }
+
 
