@@ -1,18 +1,19 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "../../firebase/admin";
-import { handleCors } from "../../utils/cors";
-
-const CLAIM_PER_USER = 2_000_000_000_000;
-const MAX_AIRDROP = 20_000_000_000_000_000;
-const COLLECTION_PATH = "airdrop/claims/claims";
+import { adminDb } from "../../../firebase/admin";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ✅ CORS 처리
-  if (handleCors(req, res)) return;
-
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+  // ✅ CORS
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    return res.status(200).end();
   }
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (applyCors(req, res)) return;
+  if (req.method !== "GET") return res.status(405).json({ error: "Method Not Allowed" });
 
   const wallet = req.query.address as string;
   const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
@@ -28,9 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
       });
       const slackData = await slackRes.json();
-      if (slackData.ok) {
-        slackMessages = slackData.messages ?? [];
-      }
+      if (slackData.ok) slackMessages = slackData.messages ?? [];
     }
 
     const claimed = firestoreClaims * CLAIM_PER_USER;
