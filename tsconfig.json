@@ -4,13 +4,42 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "esModuleInterop": true,
-    "moduleDetection": "force"
-  },
+    "moduleDetection": "force",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve"
+{
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+{
   "ts-node": {
     "experimentalSpecifierResolution": "node",
     "experimentalResolver": true,
     "transpileOnly": false,
     "esm": true,
     "logError": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
   }
 }
