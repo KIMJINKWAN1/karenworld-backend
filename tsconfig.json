@@ -7,10 +7,10 @@
     "moduleDetection": "force"
   },
   "ts-node": {
-  "experimentalSpecifierResolution": "node",
-  "experimentalResolver": true,
-  "transpileOnly": false,
-  "esm": true,
-  "logError": true,
-}
+    "experimentalSpecifierResolution": "node",
+    "experimentalResolver": true,
+    "transpileOnly": false,
+    "esm": true,
+    "logError": true
+  }
 }

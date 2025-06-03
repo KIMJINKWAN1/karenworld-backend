@@ -1,15 +1,22 @@
 import admin from 'firebase-admin';
 
-const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-if (!rawKey) {
-  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT_KEY is missing in .env");
-}
+const {
+  FIREBASE_PROJECT_ID,
+  FIREBASE_CLIENT_EMAIL,
+  FIREBASE_PRIVATE_KEY,
+} = process.env;
 
-const serviceAccount = JSON.parse(rawKey);
+if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
+  throw new Error('❌ Firebase 환경 변수가 누락되었습니다.');
+}
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert({
+      projectId: FIREBASE_PROJECT_ID,
+      clientEmail: FIREBASE_CLIENT_EMAIL,
+      privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
   });
 }
 
@@ -17,39 +24,38 @@ export const adminDb = admin.firestore();
 export const db = adminDb;
 
 /**
- * 에어드랍 대상자 등록
+ * 🔹 수령 대상 등록
  */
 export async function addRecipient(address: string, amount: number) {
   const ref = db.collection('airdrop').doc('recipients').collection('list').doc(address);
 
   await ref.set({
-    airdropAmount: amount,
+    airdropAmount: Math.floor(amount), // 정수 보장
     claimed: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  console.log(`Recipient ${address} registered for airdrop with amount ${amount}`);
+  console.log(`📩 Registered recipient: ${address} (${amount} tokens)`);
 }
 
 /**
- * 수령 여부 조회
+ * 🔹 수령 여부 확인
  */
 export async function checkRecipientClaimStatus(address: string): Promise<boolean | null> {
   const ref = db.collection('airdrop').doc('recipients').collection('list').doc(address);
   const doc = await ref.get();
 
   if (!doc.exists) {
-    console.log('Recipient not found:', address);
+    console.log(`🛑 Not found: ${address}`);
     return null;
   }
 
-  const data = doc.data();
-  return data?.claimed ?? false;
+  return doc.data()?.claimed ?? false;
 }
 
 /**
- * 수령 처리 및 트랜잭션 로그 기록
+ * 🔹 수령 완료 처리 및 로그 저장
  */
 export async function markClaimed(address: string, txHash: string, amount: number) {
   const recipientRef = db.collection('airdrop').doc('recipients').collection('list').doc(address);
@@ -64,27 +70,31 @@ export async function markClaimed(address: string, txHash: string, amount: numbe
 
   await logsRef.set({
     address,
-    amount,
+    amount: Math.floor(amount),
     txHash,
     status: 'success',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(`Claim marked and logged for ${address}`);
+  console.log(`✅ Claimed and logged: ${address}`);
 }
 
 /**
- * 수령 안 한 대상자 목록 조회
+ * 🔹 미수령 대상 목록 조회
  */
 export async function listUnclaimedRecipients(): Promise<string[]> {
-  const querySnapshot = await db.collection('airdrop').doc('recipients').collection('list')
+  const snapshot = await db
+    .collection('airdrop')
+    .doc('recipients')
+    .collection('list')
     .where('claimed', '==', false)
     .get();
 
-  const addresses = querySnapshot.docs.map(doc => doc.id);
-  console.log('Unclaimed recipients:', addresses);
+  const addresses = snapshot.docs.map(doc => doc.id);
+  console.log(`🔍 Unclaimed recipients (${addresses.length}):`, addresses);
   return addresses;
 }
+
 
 
 

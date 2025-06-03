@@ -7,18 +7,18 @@ import { Transaction } from "@mysten/sui/transactions";
 import {
   checkRecipientClaimStatus,
   markClaimed,
-} from "@/firebase/admin";
-import { sendSlackNotification } from "@/utils/slack";
+} from "../firebase/admin.ts";
+import { sendSlackNotification } from "../utils/slack.ts";
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 const AIRDROP_AMOUNT = BigInt(process.env.AIRDROP_AMOUNT || "2000");
-const NETWORK = process.env.SUI_NETWORK || "testnet";
+const NETWORK = process.env.SUI_NETWORK || "mainnet";
 
 const sui = new SuiClient({ url: getFullnodeUrl(NETWORK) });
-const fullSecret = fromB64(PRIVATE_KEY);
-const secretKey = fullSecret.slice(1);
+const secretKey = fromB64(PRIVATE_KEY).slice(1); // remove leading byte
 const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+const sender = keypair.getPublicKey().toSuiAddress();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const owned = await sui.getOwnedObjects({
-      owner: keypair.getPublicKey().toSuiAddress(),
+      owner: sender,
       options: { showType: true, showContent: true },
     });
 
@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!gas || !gas.data) throw new Error("No SUI gas coin found");
 
     const tx = new Transaction();
-    tx.setSender(keypair.getPublicKey().toSuiAddress());
+    tx.setSender(sender);
     tx.setGasPayment([
       {
         objectId: gas.data.objectId,
@@ -61,10 +61,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [tx.pure(AIRDROP_AMOUNT)]
     );
 
-    tx.transferObjects([coinToSend], wallet);
+    tx.transferObjects([coinToSend], tx.pure(wallet));
 
-    const result = await sui.signAndExecuteTransaction({
-      transaction: tx,
+    const result = await sui.signAndExecuteTransactionBlock({
+      transactionBlock: tx,
       signer: keypair,
       options: { showEffects: true },
     });
@@ -73,11 +73,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (status !== "success") throw new Error("Transaction failed");
 
     await markClaimed(wallet, result.digest, Number(AIRDROP_AMOUNT));
-    await sendSlackNotification(`🔁 재전송 성공: ${wallet} (${AIRDROP_AMOUNT} KAREN)`);
+    await sendSlackNotification(`🔁 *Retry Airdrop Success*\n• Wallet: \`${wallet}\`\n• Tx: \`${result.digest}\`\n• Amount: ${AIRDROP_AMOUNT} KAREN`);
 
     return res.status(200).json({ success: true, digest: result.digest });
   } catch (error: any) {
-    await sendSlackNotification(`🚨 재전송 실패: ${wallet}\n에러: ${error.message}`);
+    await sendSlackNotification(`🚨 *Retry Airdrop Failed*\n• Wallet: \`${wallet}\`\n• Error: \`${error.message}\``);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+

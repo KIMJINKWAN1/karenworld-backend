@@ -1,76 +1,85 @@
 import 'dotenv/config';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { fromB64 } from '@mysten/bcs';
-import { Transaction } from '@mysten/sui/transactions';
 
 import {
+  listUnclaimedRecipients,
   checkRecipientClaimStatus,
   markClaimed,
-  listUnclaimedRecipients,
 } from '../firebase/admin.ts';
 import { sendSlackNotification } from '../utils/slack.ts';
 
-// ✅ 환경 변수
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 const AIRDROP_AMOUNT = BigInt(process.env.AIRDROP_AMOUNT || '2000');
-const NETWORK = process.env.SUI_NETWORK || 'testnet';
+const NETWORK = process.env.SUI_NETWORK || 'mainnet';
 
-// ✅ 클라이언트 및 키쌍 생성
-const sui = new SuiClient({ url: getFullnodeUrl(NETWORK) });
-const fullSecret = fromB64(PRIVATE_KEY);
-const secretKey = fullSecret.slice(1);
-const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+if (!PRIVATE_KEY) throw new Error('❌ .env에 PRIVATE_KEY 누락됨');
+
+// ✅ keypair 초기화
+const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
+const sender = keypair.getPublicKey().toSuiAddress();
+console.log('🧾 Airdrop sender address:', sender);
+
+// ✅ Sui 클라이언트
+const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
 
 // ✅ 가스 코인 조회
 async function getGasCoin() {
-  const owned = await sui.getOwnedObjects({
-    owner: keypair.getPublicKey().toSuiAddress(),
+  const owned = await client.getOwnedObjects({
+    owner: sender,
     options: { showType: true, showContent: true },
   });
 
-  const gas = owned.data.find((obj) =>
-    obj.data?.type === '0x2::coin::Coin<0x2::sui::SUI>'
+  const gas = owned.data.find(
+    (o) => o.data?.type === '0x2::coin::Coin<0x2::sui::SUI>'
   );
 
-  if (!gas || !gas.data) throw new Error('❌ No SUI gas coin found');
-
-  return {
-    objectId: gas.data.objectId,
-    version: gas.data.version.toString(),
-    digest: gas.data.digest,
-  };
+  if (!gas || !gas.data) throw new Error('❌ 가스 코인 없음');
+  return gas.data;
 }
 
-// ✅ 메인 함수
+// ✅ 에어드랍 실행
 async function runAirdrop() {
+  console.log('🧾 Airdrop sender address:', sender);
   const unclaimed = await listUnclaimedRecipients();
-  console.log(`📦 Total unclaimed recipients: ${unclaimed.length}`);
+  console.log(`🔍 Unclaimed recipients (${unclaimed.length}):`, unclaimed);
 
-  for (const address of unclaimed) {
+  if (unclaimed.length === 0) {
+  console.log('⚠️ All addresses have already claimed the airdrop.');
+  return;
+}
+
+  for (const recipient of unclaimed) {
     try {
-      const already = await checkRecipientClaimStatus(address);
+      const already = await checkRecipientClaimStatus(recipient);
       if (already) {
-        console.log(`⚠️ Already claimed: ${address}`);
-        continue;
-      }
+      console.log(`⚠️ Duplicate address (already claimed): ${recipient}`);
+      continue;
+}
 
       const gasCoin = await getGasCoin();
-      const tx = new Transaction();
-      tx.setSender(keypair.getPublicKey().toSuiAddress());
-      tx.setGasPayment([gasCoin]);
-      tx.setGasBudget(10_000_000);
+      const tx = new TransactionBlock();
 
+      // 💰 코인 분할 및 전송
       const [coinToSend] = tx.splitCoins(
         tx.object(COIN_OBJECT_ID),
-        [tx.pure(AIRDROP_AMOUNT)]
+        [tx.pure(Number(AIRDROP_AMOUNT), 'u64')]
       );
+      tx.transferObjects([coinToSend], tx.pure(recipient));
 
-      tx.transferObjects([coinToSend], address);
+      tx.setSender(sender);
+      tx.setGasPayment([{
+        objectId: gasCoin.objectId,
+        version: gasCoin.version.toString(),
+        digest: gasCoin.digest,
+      }]);
+      tx.setGasBudget(10_000_000);
 
-      const result = await sui.signAndExecuteTransaction({
-        transaction: tx,
+      const result = await client.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
         signer: keypair,
         options: { showEffects: true },
       });
@@ -78,17 +87,18 @@ async function runAirdrop() {
       const status = result.effects?.status?.status;
       if (status !== 'success') throw new Error('Transaction failed');
 
-      await markClaimed(address, result.digest, Number(AIRDROP_AMOUNT));
-      console.log(`✅ Success: ${address} (${result.digest})`);
+      await markClaimed(recipient, result.digest, Number(AIRDROP_AMOUNT));
+      console.log(`✅ Claimed and logged: ${recipient}`);
+      console.log(`✅ Success: ${recipient} (${result.digest})`);
 
       await sendSlackNotification(
-        `🎯 *Airdrop Success*\n• 🧾 Wallet: \`${address}\`\n• 🔗 Tx: \`${result.digest}\`\n• 💰 Amount: ${AIRDROP_AMOUNT} KAREN`
+        `🎯 *Airdrop Success*\n• 🧾 Wallet: \`${recipient}\`\n• 🔗 Tx: \`${result.digest}\`\n• 💰 Amount: ${AIRDROP_AMOUNT} KAREN`
       );
     } catch (err: any) {
       const message = err?.message || String(err);
-      console.error(`❌ Failed for ${address}:`, message);
+      console.error(`❌ Failed for ${recipient}:`, message);
       await sendSlackNotification(
-        `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${address}\`\n• 💥 Error: \`${message}\``
+        `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${recipient}\`\n• 💥 Error: \`${message}\``
       );
     }
   }
@@ -104,4 +114,19 @@ runAirdrop()
     console.error('❌ Airdrop script failed:', e);
     process.exit(1);
   });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

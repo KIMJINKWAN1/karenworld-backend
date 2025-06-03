@@ -3,8 +3,8 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/bcs";
-import { adminDb } from "../firebase/admin";
-import { logAirdropEvent } from "../utils/logger";
+import { adminDb } from "@/firebase/admin";
+import { logAirdropEvent } from "@/utils/logger";
 
 // ✅ Utils: Base64 URL-safe → 표준 Base64
 function base64UrlToBase64(base64url: string): string {
@@ -14,17 +14,19 @@ function base64UrlToBase64(base64url: string): string {
   );
 }
 
-// ✅ Constants & Setup
-const CLAIM_PER_USER = 2_000n;
-const COLLECTION_PATH = "airdrop/claims/claims";
+// ✅ Load from environment
+const CLAIM_PER_USER = BigInt(process.env.AIRDROP_AMOUNT || "2000");
+const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 const KAREN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
+const NETWORK = process.env.SUI_NETWORK || "mainnet";
+
 const fixedKey = base64UrlToBase64(process.env.PRIVATE_KEY!);
-const secretKey = fromB64(fixedKey).slice(1); // Remove scheme flag
+const secretKey = fromB64(fixedKey).slice(1);
 const keypair = Ed25519Keypair.fromSecretKey(secretKey);
-const sui = new SuiClient({ url: getFullnodeUrl("testnet") });
+const sui = new SuiClient({ url: getFullnodeUrl(NETWORK) });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ✅ CORS Headers
+  // ✅ CORS preflight
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -44,28 +46,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Already claimed" });
   }
 
-  // ✅ Get SUI gas coin
-  const address = keypair.getPublicKey().toSuiAddress();
-  const owned = await sui.getOwnedObjects({
-    owner: address,
-    options: { showType: true, showContent: true },
-  });
-
-  const gas = owned.data.find((o) => o.data?.type?.includes("0x2::coin::Coin<0x2::sui::SUI>"))?.data;
-  if (!gas) {
-    await logAirdropEvent({ wallet, status: "error", error: "No gas coin available" });
-    return res.status(500).json({ error: "No gas coin available" });
-  }
-
-  // ✅ Airdrop Transaction
+  // ✅ Prepare transaction
   try {
+    const address = keypair.getPublicKey().toSuiAddress();
+    const owned = await sui.getOwnedObjects({
+      owner: address,
+      options: { showType: true, showContent: true },
+    });
+
+    const gas = owned.data.find(
+      (o) => o.data?.type === "0x2::coin::Coin<0x2::sui::SUI>"
+    )?.data;
+
+    if (!gas) {
+      await logAirdropEvent({ wallet, status: "error", error: "No gas coin available" });
+      return res.status(500).json({ error: "No gas coin available" });
+    }
+
     const tx = new Transaction();
     tx.setSender(address);
-    tx.setGasPayment([{
-      objectId: gas.objectId,
-      version: gas.version.toString(),
-      digest: gas.digest,
-    }]);
+    tx.setGasPayment([
+      {
+        objectId: gas.objectId,
+        version: gas.version.toString(),
+        digest: gas.digest,
+      },
+    ]);
     tx.setGasBudget(10_000_000);
 
     const [coinToSend] = tx.splitCoins(
@@ -85,7 +91,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Transaction failed" });
     }
 
-    // ✅ Save record & log
     await docRef.set({ wallet, timestamp: Date.now() });
     await logAirdropEvent({ wallet, status: "success", digest: result.digest });
 
@@ -104,5 +109,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Airdrop failed" });
   }
 }
+
 
 

@@ -24,11 +24,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Already submitted" });
   }
 
+  if (!process.env.NEXT_PUBLIC_BASE_URL) {
+    return res.status(500).json({ error: "Missing NEXT_PUBLIC_BASE_URL" });
+  }
+
   try {
     await docRef.set({ wallet, timestamp: Date.now() });
 
-    // 🔔 Slack 알림 전송
-    await sendSlackNotification(`📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\``);
+    // 🔔 Slack 알림 전송 (실패해도 무시)
+    try {
+      await sendSlackNotification(`📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\``);
+    } catch (err) {
+      console.warn("⚠️ Slack notification failed:", err);
+    }
 
     // 🎯 자동 전송 트리거
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/airdrop`, {
@@ -40,6 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await response.json();
 
     if (!response.ok) {
+      // ❗ 실패 기록 저장
+      await docRef.set({ wallet, timestamp: Date.now(), error: result.error }, { merge: true });
       console.error("❌ Airdrop failed in submit.ts:", result.error);
       return res.status(500).json({ error: "Airdrop execution failed" });
     }
@@ -54,4 +64,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
 

@@ -1,17 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { adminDb } from "../firebase/admin.ts";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const snapshot = await adminDb
-    .collection("airdrop/logs")
-    .orderBy("timestamp", "desc")
-    .limit(100)
-    .get();
+  try {
+    const snapshot = await adminDb
+      .collection("airdrop/logs")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
 
-  const logs = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+    const logs = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-  res.status(200).json({ logs });
+    res.status(200).json({ logs });
+  } catch (error: any) {
+    console.error("❌ Error fetching logs:", error);
+    res.status(500).json({ error: "Failed to fetch airdrop logs." });
+  }
 }

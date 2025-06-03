@@ -1,8 +1,10 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { adminDb } from '@/firebase/admin';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { adminDb } from "../../../firebase/admin";
 import fetch from 'node-fetch';
 
-const { SLACK_CHANNEL_ID, SLACK_BOT_TOKEN } = process.env;
+const { SLACK_CHANNEL_ID, SLACK_BOT_TOKEN, AIRDROP_COLLECTION_PATH } = process.env;
+
+const COLLECTION_PATH = AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -18,11 +20,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 🔎 1. Firestore에서 중복 수령 여부 확인
-    const doc = await adminDb.collection("airdrop/claims/claims").doc(address).get();
+    // 🔎 Firestore 중복 수령 여부 확인
+    const doc = await adminDb.collection(COLLECTION_PATH).doc(address).get();
     const alreadyClaimed = doc.exists;
 
-    // 🔎 2. Slack 제출 여부 확인
+    // 🔎 Slack 제출 여부 확인
     let alreadySubmitted = false;
     if (SLACK_CHANNEL_ID && SLACK_BOT_TOKEN) {
       const slackRes = await fetch(
@@ -48,8 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       alreadyClaimed,
       alreadySubmitted,
     });
+
   } catch (err) {
     console.error('❌ check.ts error:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
+
