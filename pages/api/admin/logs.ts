@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const snapshot = await adminDb
+    const snapshot = await admindb
       .collection("airdrop/logs")
       .orderBy("timestamp", "desc")
       .limit(100)

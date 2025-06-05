@@ -8,8 +8,8 @@ import {
   listUnclaimedRecipients,
   checkRecipientClaimStatus,
   markClaimed,
-} from '../firebase/admin.ts';
-import { sendSlackNotification } from '../utils/slack.ts';
+} from '../firebase/admin';
+import { sendSlackNotification } from '../utils/slack';
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;

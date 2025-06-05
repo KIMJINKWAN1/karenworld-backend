@@ -3,7 +3,7 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { fromB64 } from "@mysten/bcs";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 import { logAirdropEvent } from "@/utils/logger";
 
 // ✅ Utils: Base64 URL-safe → 표준 Base64
@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Invalid wallet address" });
   }
 
-  const docRef = adminDb.collection(COLLECTION_PATH).doc(wallet);
+  const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
   const existing = await docRef.get();
   if (existing.exists) {
     await logAirdropEvent({ wallet, status: "error", error: "Already claimed" });

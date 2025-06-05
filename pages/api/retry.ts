@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 import { SUI_FAUCET_TOKEN, PRIVATE_KEY } from "@/lib/constants";
 import { getFullnodeUrl, SuiClient } from "@mysten/sui.js/client";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const digest = result.digest;
-    await adminDb.collection("airdrop").doc("claims").collection("logs").doc(wallet).update({
+    await admindb.collection("airdrop").doc("claims").collection("logs").doc(wallet).update({
       retriedAt: Date.now(),
       retryDigest: digest,
     });

@@ -1,4 +1,4 @@
-import { adminDb } from "../firebase/admin";
+import { admindb } from "../firebase/admin";
 import { sendSlackNotification } from "./slack";
 
 export async function logAirdropEvent({
@@ -15,7 +15,7 @@ export async function logAirdropEvent({
   const timestamp = Date.now();
 
   // Firestore 저장
-  await adminDb.collection("airdrop/logs").add({
+  await admindb.collection("airdrop/logs").add({
     wallet,
     status,
     digest: digest || null,

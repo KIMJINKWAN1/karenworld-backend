@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 
 const COLLECTION_PATH = "airdrop/queue";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const collection = adminDb.collection(COLLECTION_PATH);
+    const collection = admindb.collection(COLLECTION_PATH);
 
     if (req.method === "GET") {
       const snapshot = await collection.get();

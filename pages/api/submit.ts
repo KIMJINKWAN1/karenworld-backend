@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
 const COLLECTION_PATH = "airdrop/claims/claims";
@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Invalid wallet address" });
   }
 
-  const docRef = adminDb.collection(COLLECTION_PATH).doc(wallet);
+  const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
   const existing = await docRef.get();
   if (existing.exists) {
     return res.status(400).json({ error: "Already submitted" });

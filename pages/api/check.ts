@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 import fetch from 'node-fetch';
 
 const { SLACK_CHANNEL_ID, SLACK_BOT_TOKEN, AIRDROP_COLLECTION_PATH } = process.env;
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // 🔎 Firestore 중복 수령 여부 확인
-    const doc = await adminDb.collection(COLLECTION_PATH).doc(address).get();
+    const doc = await admindb.collection(COLLECTION_PATH).doc(address).get();
     const alreadyClaimed = doc.exists;
 
     // 🔎 Slack 제출 여부 확인

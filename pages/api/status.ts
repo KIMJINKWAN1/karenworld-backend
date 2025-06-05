@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "@/firebase/admin";
+import { admindb } from "@/firebase/admin";
 import fetch from "node-fetch";
 
 // ✅ .env 설정값 가져오기
@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // ✅ Firestore에서 수령자 수 조회
-    const snapshot = await adminDb.collection(COLLECTION_PATH).get();
+    const snapshot = await admindb.collection(COLLECTION_PATH).get();
     const firestoreClaims = snapshot.size;
 
     // ✅ Slack 메시지 조회 (중복 제출 체크용)
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ✅ 특정 주소의 수령 여부 확인
     let alreadyClaimed = false;
     if (wallet?.startsWith("0x")) {
-      const doc = await adminDb.collection(COLLECTION_PATH).doc(wallet).get();
+      const doc = await admindb.collection(COLLECTION_PATH).doc(wallet).get();
       const normalized = wallet.toLowerCase().replace(/^0x/, "");
       const slackMatch = slackMessages.some(
         (msg) => typeof msg.text === "string" && msg.text.toLowerCase().includes(normalized)
