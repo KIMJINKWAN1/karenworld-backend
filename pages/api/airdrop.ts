@@ -18,7 +18,7 @@ function base64UrlToBase64(base64url: string): string {
 const CLAIM_PER_USER = BigInt(process.env.AIRDROP_AMOUNT || "2000");
 const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 const KAREN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
-const NETWORK = process.env.SUI_NETWORK || "mainnet";
+const NETWORK = (process.env.SUI_NETWORK || "mainnet") as "mainnet" | "testnet" | "devnet" | "localnet";
 
 const fixedKey = base64UrlToBase64(process.env.PRIVATE_KEY!);
 const secretKey = fromB64(fixedKey).slice(1);

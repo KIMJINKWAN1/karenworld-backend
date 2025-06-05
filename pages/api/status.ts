@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "../../../firebase/admin";
+import { adminDb } from "@/firebase/admin";
 import fetch from "node-fetch";
 
 // ✅ .env 설정값 가져오기

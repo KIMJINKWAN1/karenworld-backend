@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { adminDb } from "../../../firebase/admin";
+import { adminDb } from "@/firebase/admin";
 import fetch from 'node-fetch';
 
 const { SLACK_CHANNEL_ID, SLACK_BOT_TOKEN, AIRDROP_COLLECTION_PATH } = process.env;

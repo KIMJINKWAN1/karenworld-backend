@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { adminDb } from "../firebase/admin";
-import { sendSlackNotification } from "../utils/slack";
+import { adminDb } from "@/firebase/admin";
+import { sendSlackNotification } from "@/utils/slack";
 
 const COLLECTION_PATH = "airdrop/claims/claims";
 

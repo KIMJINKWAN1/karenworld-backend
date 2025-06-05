@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "../../../components/ui/card";
-import { Badge } from "../../../components/ui/badge";
-import { ScrollArea } from "../../../components/ui/scroll-area";
-import { Input } from "../../../components/ui/input";
-import { Button } from "../../../components/ui/button";
-import { Switch } from "../../../components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Download, RefreshCw, Eye } from "lucide-react";
 
 interface AirdropLog {

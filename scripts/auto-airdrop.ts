@@ -14,7 +14,11 @@ import { sendSlackNotification } from '../utils/slack.ts';
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 const AIRDROP_AMOUNT = BigInt(process.env.AIRDROP_AMOUNT || '2000');
-const NETWORK = process.env.SUI_NETWORK || 'mainnet';
+const NETWORK = (process.env.SUI_NETWORK || "mainnet") as
+  | "mainnet"
+  | "testnet"
+  | "devnet"
+  | "localnet";
 
 if (!PRIVATE_KEY) throw new Error('❌ .env에 PRIVATE_KEY 누락됨');
 

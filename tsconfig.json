@@ -5,11 +5,7 @@
     "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "moduleDetection": "force",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -17,15 +13,12 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve"
-{
+    "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
-  }
-}
-{
+  },
   "ts-node": {
     "experimentalSpecifierResolution": "node",
     "experimentalResolver": true,
@@ -33,13 +26,8 @@
     "esm": true,
     "logError": true
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
-  }
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }
+
+
