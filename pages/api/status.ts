@@ -5,7 +5,7 @@ import fetch from "node-fetch";
 // ✅ .env 설정값 가져오기
 const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 const CLAIM_PER_USER = BigInt(process.env.AIRDROP_AMOUNT || "2000");
-const MAX_AIRDROP = BigInt(process.env.MAX_AIRDROP_TOTAL || "42069000");
+const MAX_AIRDROP = BigInt(process.env.MAX_AIRDROP_TOTAL || "200000000");
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID;
 

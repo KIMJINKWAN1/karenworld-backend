@@ -1,43 +1,17 @@
 {
   "polyfillFiles": [
-    "static/chunks/polyfills-42372ed130431b0a.js"
+    "static/chunks/polyfills.js"
   ],
   "devFiles": [],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/DdNrTmbXeeMR7vGtxqMYq/_buildManifest.js",
-    "static/DdNrTmbXeeMR7vGtxqMYq/_ssgManifest.js"
+    "static/development/_buildManifest.js",
+    "static/development/_ssgManifest.js"
   ],
   "rootMainFiles": [],
   "rootMainFilesTree": {},
   "pages": {
-    "/_app": [
-      "static/chunks/webpack-e77e5add926d7def.js",
-      "static/chunks/framework-2f335d22a7318891.js",
-      "static/chunks/main-4c23680d4b230a3e.js",
-      "static/chunks/pages/_app-192a2aa6e59bbef8.js"
-    ],
-    "/_error": [
-      "static/chunks/webpack-e77e5add926d7def.js",
-      "static/chunks/framework-2f335d22a7318891.js",
-      "static/chunks/main-4c23680d4b230a3e.js",
-      "static/chunks/pages/_error-6ba75d581b05348e.js"
-    ],
-    "/admin/airdrop-log": [
-      "static/chunks/webpack-e77e5add926d7def.js",
-      "static/chunks/framework-2f335d22a7318891.js",
-      "static/chunks/main-4c23680d4b230a3e.js",
-      "static/chunks/150-205b4ca366def17b.js",
-      "static/chunks/260-5ead596a97d2e05d.js",
-      "static/chunks/pages/admin/airdrop-log-fd56d2770fb96b6c.js"
-    ],
-    "/admin/queue": [
-      "static/chunks/webpack-e77e5add926d7def.js",
-      "static/chunks/framework-2f335d22a7318891.js",
-      "static/chunks/main-4c23680d4b230a3e.js",
-      "static/chunks/150-205b4ca366def17b.js",
-      "static/chunks/pages/admin/queue-99e6ea4f8d0124bd.js"
-    ]
+    "/_app": []
   },
   "ampFirstPages": []
 }
