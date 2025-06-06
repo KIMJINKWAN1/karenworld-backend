@@ -5,7 +5,7 @@ import { sendSlackNotification } from "@/utils/slack";
 const COLLECTION_PATH = "airdrop/claims/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ✅ CORS 처리
+  // ✅ CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -29,16 +29,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // 🔹 Firestore 기록
     await docRef.set({ wallet, timestamp: Date.now() });
 
-    // 🔔 Slack 알림 전송 (실패해도 무시)
+    // 🔔 Slack 알림 (optional)
     try {
       await sendSlackNotification(`📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\``);
     } catch (err) {
-      console.warn("⚠️ Slack notification failed:", err);
+      console.warn("⚠️ Slack notification failed:", (err as Error).message);
     }
 
-    // 🎯 자동 전송 트리거
+    // 🔄 자동 에어드랍 트리거
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/airdrop`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,9 +49,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await response.json();
 
     if (!response.ok) {
-      // ❗ 실패 기록 저장
-      await docRef.set({ wallet, timestamp: Date.now(), error: result.error }, { merge: true });
-      console.error("❌ Airdrop failed in submit.ts:", result.error);
+      await docRef.set(
+        { wallet, timestamp: Date.now(), error: result.error || "Unknown error" },
+        { merge: true }
+      );
+      console.error("❌ Airdrop failed:", result.error);
       return res.status(500).json({ error: "Airdrop execution failed" });
     }
 
@@ -60,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       digest: result.digest,
     });
   } catch (err: any) {
-    console.error("❌ Submit error:", err);
+    console.error("❌ Submit handler error:", err.message || err);
     return res.status(500).json({ error: "Submit failed" });
   }
 }
