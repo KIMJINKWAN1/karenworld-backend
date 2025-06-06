@@ -95,10 +95,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await logAirdropEvent({ wallet, status: "success", digest: result.digest });
 
     return res.status(200).json({
-      success: true,
-      digest: result.digest,
-      amount: CLAIM_PER_USER,
-    });
+  success: true,
+  digest: result.digest,
+  amount: CLAIM_PER_USER,
+});
 
   } catch (err: any) {
     await logAirdropEvent({
