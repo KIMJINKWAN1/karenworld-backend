@@ -60,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       success: true,
       message: "Airdrop sent successfully",
+      amount: result.amount ?? 2000, // 에어드랍 수량 명시
       digest: result.digest,
     });
   } catch (err: any) {
