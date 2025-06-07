@@ -11,22 +11,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
-
-  const { wallet } = req.body;
-  if (!wallet || typeof wallet !== "string" || !wallet.startsWith("0x")) {
-    return res.status(400).json({ error: "Invalid wallet address" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
-  const existing = await docRef.get();
-  if (existing.exists) {
-    return res.status(400).json({ error: "Already submitted" });
+  const { wallet } = req.body;
+
+  if (!wallet || typeof wallet !== "string") {
+    return res.status(400).json({ error: "Invalid wallet" });
   }
 
   if (!process.env.NEXT_PUBLIC_BASE_URL) {
     return res.status(500).json({ error: "Missing NEXT_PUBLIC_BASE_URL" });
   }
+
+  const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
 
   try {
     // 🔹 Firestore 기록
@@ -46,21 +45,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: JSON.stringify({ wallet }),
     });
 
-    const result = await response.json();
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch (err) {
+      console.warn("❌ Failed to parse JSON response:", err);
+    }
 
-    if (!response.ok) {
+    if (!response.ok || !result) {
       await docRef.set(
-        { wallet, timestamp: Date.now(), error: result.error || "Unknown error" },
+        { wallet, timestamp: Date.now(), error: result?.error ?? "Unknown error" },
         { merge: true }
       );
-      console.error("❌ Airdrop failed:", result.error);
-      return res.status(500).json({ error: "Airdrop execution failed" });
+      return res.status(500).json({ error: result?.error ?? "Airdrop execution failed" });
     }
 
     return res.status(200).json({
       success: true,
       message: "Airdrop sent successfully",
-      amount: result.amount ?? 2000, // 에어드랍 수량 명시
+      amount: result.amount ?? 2000,
       digest: result.digest,
     });
   } catch (err: any) {
@@ -68,5 +71,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
 
 
