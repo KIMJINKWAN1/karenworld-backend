@@ -2,18 +2,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
-const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
+const COLLECTION_PATH = "airdrop/prod/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ✅ CORS
+  // ✅ CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end(); // preflight 처리
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   const { wallet } = req.body;
   if (!wallet || typeof wallet !== "string") {
@@ -23,23 +21,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
 
   try {
+    // 🔹 Firestore 기록
     await docRef.set({ wallet, timestamp: Date.now() });
 
+    // 🔔 Slack 알림 (optional)
     try {
       await sendSlackNotification(`📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\``);
     } catch (err) {
       console.warn("⚠️ Slack notification failed:", (err as Error).message);
     }
 
-    if (!process.env.NEXT_PUBLIC_BASE_URL) {
-      return res.status(500).json({ error: "Missing NEXT_PUBLIC_BASE_URL" });
-    }
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/airdrop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet }),
-    });
+    // 🔄 자동 에어드랍 트리거 (상대 경로 사용)
+    const response = await fetch("/api/airdrop", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ wallet }),
+});
 
     let result: any = null;
     try {
@@ -67,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
 
 
 

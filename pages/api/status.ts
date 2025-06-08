@@ -4,13 +4,13 @@ import { admindb } from "@/firebase/admin";
 const COLLECTION_PATH = "airdrop/prod/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ✅ CORS 헤더 설정
+  // ✅ CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ OPTIONS preflight 요청 처리
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") return res.status(200).end(); // preflight 처리
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   try {
     const snapshot = await admindb.collection(COLLECTION_PATH).get();

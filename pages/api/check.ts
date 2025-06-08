@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { NextApiRequest, NextApiResponse } from "next";
 import { admindb } from "@/firebase/admin";
 import fetch from 'node-fetch';
 
@@ -6,12 +6,13 @@ const { SLACK_CHANNEL_ID, SLACK_BOT_TOKEN, AIRDROP_COLLECTION_PATH } = process.e
 
 const COLLECTION_PATH = AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // ✅ CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") return res.status(200).end(); // preflight 처리
   if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   const { address } = req.body;
