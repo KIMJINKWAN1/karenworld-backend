@@ -21,24 +21,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Invalid wallet" });
   }
 
-  if (!process.env.NEXT_PUBLIC_BASE_URL) {
-    return res.status(500).json({ error: "Missing NEXT_PUBLIC_BASE_URL" });
-  }
-
   const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
 
   try {
-    // 🔹 Firestore 기록
     await docRef.set({ wallet, timestamp: Date.now() });
 
-    // 🔔 Slack 알림 (optional)
     try {
       await sendSlackNotification(`📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\``);
     } catch (err) {
       console.warn("⚠️ Slack notification failed:", (err as Error).message);
     }
 
-    // 🔄 자동 에어드랍 트리거
+    if (!process.env.NEXT_PUBLIC_BASE_URL) {
+      return res.status(500).json({ error: "Missing NEXT_PUBLIC_BASE_URL" });
+    }
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/airdrop`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,6 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
 
 
 
