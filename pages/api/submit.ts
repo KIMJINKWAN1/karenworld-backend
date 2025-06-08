@@ -1,26 +1,28 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { getFirestore } from "firebase-admin/firestore";
 import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
-const COLLECTION_PATH = "airdrop/prod/claims";
+const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // ✅ CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "GET") return res.status(405).json({ error: "Method Not Allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   const { wallet } = req.body;
   if (!wallet || typeof wallet !== "string") {
-    return res.status(400).json({ error: "Invalid wallet" });
+    return res.status(400).json({ error: "Missing wallet address" });
   }
 
-  const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
-
   try {
+    const db = getFirestore(admindb);
+    const docRef = db.collection(COLLECTION_PATH).doc(wallet);
+
     // 🔹 Firestore 기록
     await docRef.set({ wallet, timestamp: Date.now() });
 
@@ -32,11 +34,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // 🔄 자동 에어드랍 트리거 (상대 경로 사용)
-    const response = await fetch("/api/airdrop", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ wallet }),
-});
+    const response = await fetch(`${req.headers.origin || ""}/api/airdrop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet }),
+    });
 
     let result: any = null;
     try {
@@ -66,6 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 console.log("🔥 submit API called");
+
 
 
 
