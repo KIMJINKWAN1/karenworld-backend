@@ -50,7 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Sui 클라이언트 및 키페어 초기화
   const keypair = Ed25519Keypair.fromSecretKey(fromB64(privateKey).slice(1));
-  const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK || "mainnet") });
+  const network = (process.env.SUI_NETWORK || "mainnet") as "mainnet" | "testnet" | "devnet" | "localnet";
+  const client = new SuiClient({ url: getFullnodeUrl(network) });
 
   try {
     const result = await client.signAndExecuteTransactionBlock({
