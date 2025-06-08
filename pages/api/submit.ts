@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
-const COLLECTION_PATH = "airdrop/claims/claims";
+const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/claims/claims";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // ✅ CORS
@@ -16,7 +16,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { wallet } = req.body;
-
   if (!wallet || typeof wallet !== "string") {
     return res.status(400).json({ error: "Invalid wallet" });
   }
@@ -68,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
 
 
 
