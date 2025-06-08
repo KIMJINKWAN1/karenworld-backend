@@ -7,11 +7,11 @@ const COLLECTION_PATH = "airdrop/prod/claims";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // ✅ CORS 설정
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") return res.status(200).end(); // preflight 처리
-  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "GET") return res.status(405).json({ error: "Method Not Allowed" });
 
   const { wallet } = req.body;
   if (!wallet || typeof wallet !== "string") {
@@ -64,6 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Submit failed" });
   }
 }
+
+console.log("🔥 submit API called");
 
 
 
