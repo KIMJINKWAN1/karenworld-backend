@@ -19,8 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Missing wallet address" });
   }
 
-  try {
-    const db = getFirestore(admindb);
+    try {
+    const db = admindb;  // ✅ 수정 완료
     const docRef = db.collection(COLLECTION_PATH).doc(wallet);
 
     // 🔹 Firestore 기록
