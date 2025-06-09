@@ -26,8 +26,9 @@
     "esm": true,
     "logError": true
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "scripts/**/*.ts"],
   "exclude": ["node_modules"]
 }
+
 
 
