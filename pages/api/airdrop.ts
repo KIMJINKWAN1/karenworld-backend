@@ -3,59 +3,72 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { fromB64 } from "@mysten/bcs";
 import { sendSlackNotification } from "@/utils/slack";
+import dotenv from "dotenv";
 
-const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK || "mainnet") });
+dotenv.config();
 
-const handler = async (req: NextApiRequest, res: NextApiResponse) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+const PRIVATE_KEY = process.env.PRIVATE_KEY!;
+const AIRDROP_WALLET_ADDRESS = process.env.AIRDROP_WALLET_ADDRESS!;
+const KAREN_COIN_TYPE = process.env.KAREN_COIN_TYPE!;
+const AIRDROP_AMOUNT = parseInt(process.env.AIRDROP_AMOUNT || "2000");
+const SUI_NETWORK = process.env.SUI_NETWORK || "mainnet";
+
+const client = new SuiClient({ url: getFullnodeUrl(SUI_NETWORK) });
+const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY).slice(1));
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
 
   const { wallet } = req.body;
+
   if (!wallet || typeof wallet !== "string") {
     return res.status(400).json({ error: "Missing wallet address" });
   }
 
   try {
-    const privateKeyBase64 = process.env.PRIVATE_KEY!;
-    const keypair = Ed25519Keypair.fromSecretKey(fromB64(privateKeyBase64));
-    const packageId = process.env.SUI_FAUCET_TOKEN!;
-    const distributor = process.env.AIRDROP_WALLET_ADDRESS!;
-    const tokenType = process.env.KAREN_COIN_TYPE!;
-    const amount = process.env.AIRDROP_AMOUNT || "2000";
+    const tx = await client.transactionBlock();
+    tx.setSender(keypair.getPublicKey().toSuiAddress());
+    tx.setGasBudget(100_000_000);
 
-    // 트랜잭션 구성
-    const tx = await client.newTransactionBlock();
-    tx.setGasBudget(100000000);
     tx.moveCall({
-      target: `${packageId}::airdrop::send_to`,
+      target: `${process.env.KAREN_COIN_OBJECT_ID}::airdrop::send_to`,
       arguments: [
-        tx.object(distributor),
+        tx.object(AIRDROP_WALLET_ADDRESS),
         tx.pure(wallet),
-        tx.pure(tokenType),
-        tx.pure(amount),
+        tx.pure(KAREN_COIN_TYPE),
+        tx.pure(AIRDROP_AMOUNT.toString()),
       ],
     });
 
     const result = await client.signAndExecuteTransactionBlock({
-      transactionBlock: tx,
       signer: keypair,
+      transactionBlock: tx,
     });
 
-    await sendSlackNotification(`✅ *Airdrop Success*\n• Wallet: \`${wallet}\`\n• Digest: \`${result.digest}\``);
+    await sendSlackNotification(`✅ *Airdrop Sent!*\n• 🧾 Wallet: \`${wallet}\`\n• 🔁 Tx: ${result.digest}`);
 
     return res.status(200).json({
       success: true,
       digest: result.digest,
-      amount,
+      amount: AIRDROP_AMOUNT,
     });
-
   } catch (err: any) {
-    console.error("❌ Airdrop error:", err.message || err);
-    await sendSlackNotification(`❌ *Airdrop Failed*\n• Wallet: \`${wallet}\`\n• Error: \`${err.message || err}\``);
-    return res.status(500).json({ error: "Airdrop execution failed" });
+    console.error("❌ Airdrop Error:", err.message || err);
+    return res.status(500).json({ error: err.message || "Airdrop execution failed" });
   }
-};
+}
 
-export default handler;
 
 
 
