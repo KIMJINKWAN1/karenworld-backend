@@ -1,73 +1,114 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { fromB64 } from "@mysten/bcs";
-import { sendSlackNotification } from "@/utils/slack";
-import dotenv from "dotenv";
+import { getFirestore } from "firebase-admin/firestore";
+import { admindb } from "@/firebase/admin";
+import { logger, logAirdropResult } from "@/utils/logger";
 
-dotenv.config();
+import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
+import { TransactionBlock } from "@mysten/sui.js/transactions";
+import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
+import { fromB64, normalizeSuiAddress } from "@mysten/sui.js/utils";
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const AIRDROP_WALLET_ADDRESS = process.env.AIRDROP_WALLET_ADDRESS!;
-const KAREN_COIN_TYPE = process.env.KAREN_COIN_TYPE!;
-const AIRDROP_AMOUNT = parseInt(process.env.AIRDROP_AMOUNT || "2000");
-const SUI_NETWORK = process.env.SUI_NETWORK || "mainnet";
+const db = getFirestore();
+const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK as any) });
 
-const client = new SuiClient({ url: getFullnodeUrl(SUI_NETWORK) });
-const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY).slice(1));
+const AIRDROP_AMOUNT = Number(process.env.AIRDROP_AMOUNT || "2000");
+const MAX_AIRDROP = Number(process.env.MAX_AIRDROP || "20000000");
+const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH!;
+const PRIVATE_KEY = process.env.SUI_PRIVKEY!;
+const COIN_TYPE = process.env.KAREN_COIN_TYPE!;
+const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
+
+const PACKAGE_ID = process.env.KAREN_COIN_PACKAGE_ID!;
+const MODULE_NAME = "karen_world";
+const TARGET = `${PACKAGE_ID}::${MODULE_NAME}::transfer`;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return res.status(200).end();
-  }
-
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const { address } = req.body;
+if (
+  !address ||
+  typeof address !== "string" ||
+  !address.startsWith("0x") ||
+  !/^[0-9a-fA-F]+$/.test(address.slice(2))
+) {
+  return res.status(400).json({ error: "Invalid wallet address" });
+}
 
-  const { wallet } = req.body;
+  const recipient = normalizeSuiAddress(address);
+  const snapshot = await db.collection(COLLECTION_PATH).doc(recipient).get();
 
-  if (!wallet || typeof wallet !== "string") {
-    return res.status(400).json({ error: "Missing wallet address" });
+  if (snapshot.exists) {
+    return res.status(409).json({ error: "Already claimed" });
   }
+
+  const current = await db.collection(COLLECTION_PATH).count().get();
+  const currentCount = current.data().count || 0;
+
+  if (currentCount * AIRDROP_AMOUNT >= MAX_AIRDROP) {
+    return res.status(403).json({ error: "Airdrop quota exceeded" });
+  }
+
+  const tx = new TransactionBlock();
+
+ tx.moveCall({
+  target: `${process.env.KAREN_COIN_PACKAGE_ID!}::karen_world::transfer`,
+  typeArguments: [COIN_TYPE],
+  arguments: [
+    tx.object(COIN_OBJECT_ID),
+    tx.pure(recipient),
+    tx.pure(Number(AIRDROP_AMOUNT), "u64"),
+  ],
+});
+
+
+  const timestamp = Date.now();
 
   try {
-    const tx = await client.transactionBlock();
-    tx.setSender(keypair.getPublicKey().toSuiAddress());
-    tx.setGasBudget(100_000_000);
-
-    tx.moveCall({
-      target: `${process.env.KAREN_COIN_OBJECT_ID}::airdrop::send_to`,
-      arguments: [
-        tx.object(AIRDROP_WALLET_ADDRESS),
-        tx.pure(wallet),
-        tx.pure(KAREN_COIN_TYPE),
-        tx.pure(AIRDROP_AMOUNT.toString()),
-      ],
-    });
-
+    const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
     const result = await client.signAndExecuteTransactionBlock({
-      signer: keypair,
       transactionBlock: tx,
+      signer: keypair,
+      options: { showEffects: true },
     });
 
-    await sendSlackNotification(`✅ *Airdrop Sent!*\n• 🧾 Wallet: \`${wallet}\`\n• 🔁 Tx: ${result.digest}`);
+    await db.collection(COLLECTION_PATH).doc(recipient).set({
+      address: recipient,
+      txDigest: result.digest,
+      timestamp,
+    });
 
-    return res.status(200).json({
-      success: true,
+    await logAirdropResult({
+      wallet: recipient,
+      status: "success",
       digest: result.digest,
-      amount: AIRDROP_AMOUNT,
+      timestamp,
     });
-  } catch (err: any) {
-    console.error("❌ Airdrop Error:", err.message || err);
-    return res.status(500).json({ error: err.message || "Airdrop execution failed" });
+
+    res.status(200).json({ success: true, digest: result.digest });
+  } catch (err) {
+    const message = (err as Error).message;
+
+    await logAirdropResult({
+      wallet: recipient,
+      status: "error",
+      error: message,
+      timestamp,
+    });
+
+    res.status(500).json({ error: "Airdrop failed", detail: message });
   }
 }
+
+
+
+
+
+
+
+
 
 
 
