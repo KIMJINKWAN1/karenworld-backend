@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getFirestore } from "firebase-admin/firestore";
 import { admindb } from "@/firebase/admin";
 import { logger, logAirdropResult } from "@/utils/logger";
+import { sendSlackNotification } from "@/utils/slack";
 
 import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
@@ -27,7 +28,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  try {
+
   const { address } = req.body;
+
 if (
   !address ||
   typeof address !== "string" ||
@@ -63,16 +67,14 @@ if (
   ],
 });
 
-
-  const timestamp = Date.now();
-
-  try {
-    const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
+const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
     const result = await client.signAndExecuteTransactionBlock({
       transactionBlock: tx,
       signer: keypair,
       options: { showEffects: true },
     });
+
+    const timestamp = Date.now();
 
     await db.collection(COLLECTION_PATH).doc(recipient).set({
       address: recipient,
@@ -87,38 +89,33 @@ if (
       timestamp,
     });
 
-    res.status(200).json({ success: true, digest: result.digest });
-  } catch (err) {
-    const message = (err as Error).message;
+    return res.status(200).json({ success: true, digest: result.digest });
+
+  } catch (err: any) {
+    const timestamp = Date.now();
+
+    const message = err?.message || "Unknown error";
+    const stack = err?.stack || "";
+    const code = err?.code || "UNKNOWN_CODE";
+    const kind = err?.kind || "UnknownKind";
+
+    console.error("❌ Airdrop transaction failed");
+    console.error("🔎 Error Message:", message);
+    console.error("🧩 Kind:", kind);
+    console.error("🔐 Code:", code);
+    console.error("📦 Stack:", stack.split("\n")[0]);
 
     await logAirdropResult({
-      wallet: recipient,
+      wallet: req.body?.address || "unknown",
       status: "error",
-      error: message,
+      error: `[${code}] ${message} | ${stack.split("\n")[0]}`,
       timestamp,
     });
 
-    res.status(500).json({ error: "Airdrop failed", detail: message });
+    await sendSlackNotification(
+      `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${req.body?.address || "unknown"}\`\n• 💥 Error: \`${message}\`\n• 🧩 Code: \`${code}\`\n• 🧠 Kind: \`${kind}\``
+    );
+
+    return res.status(500).json({ error: "Airdrop failed", detail: message });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
