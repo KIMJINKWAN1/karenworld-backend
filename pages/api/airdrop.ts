@@ -39,11 +39,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  try {
-    console.log("🔥 [REQ] method:", req.method);
-    console.log("📦 [REQ] headers:", JSON.stringify(req.headers, null, 2));
-    console.log("📨 [REQ] body:", req.body);
-    console.log("📥 Received body:", req.body);
+ try {
+    const rawBody = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Uint8Array[] = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => resolve(Buffer.concat(chunks)));
+      req.on("error", reject);
+    });
 
     const { address, amount } = req.body;
 
