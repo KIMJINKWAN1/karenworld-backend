@@ -1,3 +1,9 @@
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getFirestore } from "firebase-admin/firestore";
 import { admindb } from "@/firebase/admin";
@@ -8,12 +14,6 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { fromB64, normalizeSuiAddress } from "@mysten/sui.js/utils";
-
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
 
 const db = getFirestore();
 const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK as any) });
