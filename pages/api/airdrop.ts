@@ -9,6 +9,12 @@ import { TransactionBlock } from "@mysten/sui.js/transactions";
 import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
 import { fromB64, normalizeSuiAddress } from "@mysten/sui.js/utils";
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 const db = getFirestore();
 const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK as any) });
 
@@ -22,12 +28,6 @@ const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
 const PACKAGE_ID = process.env.KAREN_COIN_PACKAGE_ID!;
 const MODULE_NAME = "karen_world";
 const TARGET = `${PACKAGE_ID}::${MODULE_NAME}::transfer`;
-
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'OPTIONS') {
