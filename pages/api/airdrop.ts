@@ -1,144 +1,63 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { getFirestore } from "firebase-admin/firestore";
-import { admindb } from "@/firebase/admin";
-import { logger, logAirdropResult } from "@/utils/logger";
-import { sendSlackNotification } from "@/utils/slack";
-
-import { SuiClient, getFullnodeUrl } from "@mysten/sui.js/client";
-import { TransactionBlock } from "@mysten/sui.js/transactions";
-import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
-import { fromB64, normalizeSuiAddress } from "@mysten/sui.js/utils";
-
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
-
-const db = getFirestore();
-const client = new SuiClient({ url: getFullnodeUrl(process.env.SUI_NETWORK as any) });
-
-const AIRDROP_AMOUNT = Number(process.env.AIRDROP_AMOUNT || "2000");
-const MAX_AIRDROP = Number(process.env.MAX_AIRDROP || "20000000");
-const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH!;
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const COIN_TYPE = process.env.KAREN_COIN_TYPE!;
-const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
-const PACKAGE_ID = process.env.KAREN_COIN_PACKAGE_ID!;
-const MODULE_NAME = "karen_world";
-const TARGET = `${PACKAGE_ID}::${MODULE_NAME}::transfer`;
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { admindb } from '@/firebase/admin';
+import { sendSlackNotification } from '@/utils/slack';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === "OPTIONS") {
-    res.setHeader("Allow", ["POST"]);
-    return res.status(200).end();
+  if (req.method !== 'POST') {
+    console.warn(`❌ Invalid method: ${req.method}`);
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  if (req.method !== "POST") {
-    res.setHeader("Allow", ["POST"]);
-    return res.status(405).json({ error: "Method Not Allowed" });
+  const { address } = req.body;
+
+  // ✅ 1. 주소 유효성 검사
+  if (
+    typeof address !== 'string' ||
+    !/^0x[a-fA-F0-9]{40,64}$/.test(address)
+  ) {
+    console.warn(`⚠️ Invalid address submitted: ${address}`);
+    return res.status(400).json({ message: 'Invalid wallet address' });
   }
 
- try {
-    const rawBody = await new Promise<Buffer>((resolve, reject) => {
-      const chunks: Uint8Array[] = [];
-      req.on("data", (chunk) => chunks.push(chunk));
-      req.on("end", () => resolve(Buffer.concat(chunks)));
-      req.on("error", reject);
-    });
+  const queueRef = admindb.collection('airdrop').doc('claims').collection('queue').doc(address);
+  const claimsRef = admindb.collection('airdrop').doc('claims').collection('claims').doc(address);
 
-    const { address, amount } = req.body;
+  try {
+    // ✅ 2. 이미 수령 or 등록 여부 확인
+    const [claimedSnap, queuedSnap] = await Promise.all([
+      claimsRef.get(),
+      queueRef.get(),
+    ]);
 
-    console.log("🎯 [BODY] address:", address);
-    console.log("💰 [BODY] amount:", amount);
-
-    if (
-      !address ||
-      typeof address !== "string" ||
-      !address.startsWith("0x") ||
-      !/^[0-9a-fA-F]+$/.test(address.slice(2))
-    ) {
-      return res.status(400).json({ error: "Invalid wallet address" });
+    if (claimedSnap.exists) {
+      console.info(`ℹ️ Already claimed: ${address}`);
+      return res.status(200).json({ message: 'Already claimed' });
     }
 
-    const recipient = normalizeSuiAddress(address);
-    const snapshot = await db.collection(COLLECTION_PATH).doc(recipient).get();
-
-    if (snapshot.exists) {
-      return res.status(409).json({ error: "Already claimed" });
+    if (queuedSnap.exists) {
+      console.info(`ℹ️ Already in queue: ${address}`);
+      return res.status(200).json({ message: 'Already queued' });
     }
 
-    const current = await db.collection(COLLECTION_PATH).count().get();
-    const currentCount = current.data().count || 0;
+    // ✅ 3. Firestore 등록
+    await queueRef.set({ address, createdAt: Date.now() });
+    console.log(`✅ Queued airdrop address: ${address}`);
 
-    if (currentCount * AIRDROP_AMOUNT >= MAX_AIRDROP) {
-      return res.status(403).json({ error: "Airdrop quota exceeded" });
-    }
-
-    const tx = new TransactionBlock();
-
-    tx.moveCall({
-      target: `${process.env.KAREN_COIN_PACKAGE_ID!}::karen_world::transfer`,
-      typeArguments: [COIN_TYPE],
-      arguments: [
-        tx.object(COIN_OBJECT_ID),
-        tx.pure(recipient),
-        tx.pure(Number(AIRDROP_AMOUNT), "u64"),
-      ],
-    });
-
-    const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
-
-    const result = await client.signAndExecuteTransactionBlock({
-      transactionBlock: tx,
-      signer: keypair,
-      options: { showEffects: true },
-    });
-
-    const timestamp = Date.now();
-
-    await db.collection(COLLECTION_PATH).doc(recipient).set({
-      address: recipient,
-      txDigest: result.digest,
-      timestamp,
-    });
-
-    await logAirdropResult({
-      wallet: recipient,
-      status: "success",
-      digest: result.digest,
-      timestamp,
-    });
-
-    return res.status(200).json({ success: true, digest: result.digest });
-
-  } catch (err: any) {
-    const timestamp = Date.now();
-
-    const message = err?.message || "Unknown error";
-    const stack = err?.stack || "";
-    const code = err?.code || "UNKNOWN_CODE";
-    const kind = err?.kind || "UnknownKind";
-
-    console.error("❌ Airdrop transaction failed");
-    console.error("🔎 Error Message:", message);
-    console.error("🧩 Kind:", kind);
-    console.error("🔐 Code:", code);
-    console.error("📦 Stack:", stack.split("\n")[0]);
-    console.log("🔥 METHOD:", req.method);
-    console.log("🔥 HEADERS:", req.headers);
-
-    await logAirdropResult({
-      wallet: req.body?.address || "unknown",
-      status: "error",
-      error: `[${code}] ${message} | ${stack.split("\n")[0]}`,
-      timestamp,
-    });
-
+    // ✅ 4. Slack 알림 전송
     await sendSlackNotification(
-      `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${req.body?.address || "unknown"}\`\n• 💥 Error: \`${message}\`\n• 🧩 Code: \`${code}\`\n• 🧠 Kind: \`${kind}\``
+      `📥 *New Airdrop Request* 등록됨\n• 🧾 Wallet: \`${address}\`\n• 🕓 Time: ${new Date().toISOString()}`
     );
 
-    return res.status(500).json({ error: "Airdrop failed", detail: message });
+    return res.status(200).json({ message: 'Successfully queued for airdrop' });
+  } catch (err: any) {
+    const errorMessage = err?.message || String(err);
+    console.error(`❌ Error queuing airdrop for ${address}: ${errorMessage}`);
+
+    await sendSlackNotification(
+      `❌ *Airdrop Queue Error*\n• 🧾 Wallet: \`${address}\`\n• 💥 Error: \`${errorMessage}\`\n• 🕓 Time: ${new Date().toISOString()}`
+    );
+
+    return res.status(500).json({ message: 'Server error. Try again later.' });
   }
 }
+
