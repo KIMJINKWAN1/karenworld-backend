@@ -1,6 +1,16 @@
 {
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
+  "/admin/airdrop-log": "pages/admin/airdrop-log.html",
+  "/api/admin/logs": "pages/api/admin/logs.js",
+  "/admin/queue": "pages/admin/queue.html",
+  "/api/check": "pages/api/check.js",
+  "/api/airdrop": "pages/api/airdrop.js",
+  "/api": "pages/api.js",
+  "/api/queue": "pages/api/queue.js",
+  "/api/retry": "pages/api/retry.js",
+  "/api/status": "pages/api/status.js",
+  "/api/submit": "pages/api/submit.js",
   "/_document": "pages/_document.js",
-  "/api/status": "pages/api/status.js"
+  "/404": "pages/404.html"
 }

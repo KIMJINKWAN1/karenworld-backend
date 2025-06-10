@@ -9,7 +9,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "ts-node": "ts-node"
+    "ts-node": "ts-node",
+    "auto-airdrop": "tsx --esm scripts/auto-airdrop.ts",
+     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
