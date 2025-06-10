@@ -43,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log("🔥 [REQ] method:", req.method);
     console.log("📦 [REQ] headers:", JSON.stringify(req.headers, null, 2));
     console.log("📨 [REQ] body:", req.body);
+    console.log("📥 Received body:", req.body);
 
     const { address, amount } = req.body;
 
