@@ -35,16 +35,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 const response = await fetch(`${ORIGIN}/api/airdrop`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ address: wallet }),
+  body: JSON.stringify({ wallet }),
 });
 
-    let result: any = null;
-    try {
-      result = await response.json();
-    } catch (err) {
-      const fallback = await response.text();
-      console.warn("❌ Failed to parse JSON response from airdrop:", fallback);
-    }
+    let result: any;
+try {
+  result = await response.json();
+} catch (e) {
+  const text = await response.text();
+  console.warn("❌ JSON 파싱 실패, 원본 응답:", text);
+  result = null;
+}
 
     if (!response.ok || !result) {
       await queueRef.set(
