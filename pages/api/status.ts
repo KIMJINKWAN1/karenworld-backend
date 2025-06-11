@@ -18,16 +18,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const snapshot = await admindb.collection(COLLECTION_PATH).get();
-    const claimedCount = snapshot.size;
-    const totalClaimed = claimedCount * 2000;
-    const remaining = MAX_AIRDROP - totalClaimed;
+    const claimedCount = snapshot.size; // ✅ 청구한 지갑 수
+const totalClaimed = claimedCount * 2000;
+const remaining = MAX_AIRDROP - totalClaimed;
 
-    return res.status(200).json({
+  return res.status(200).json({
   success: true,
-  claimedCount,
-  totalClaimed,
-  remaining,
-  percent: ((totalClaimed / MAX_AIRDROP) * 100).toFixed(2),
+  claimedCount,            // ✅ 지갑 수
+  totalClaimed,            // ✅ 전체 수령된 토큰 수량
+  remaining,               // ✅ 잔여 토큰
+  total: MAX_AIRDROP,      // ✅ 전체 에어드랍 한도
+  percent: (totalClaimed / MAX_AIRDROP) * 100, // ✅ 퍼센트
 });
 
   } catch (err) {
