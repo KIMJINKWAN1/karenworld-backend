@@ -10,17 +10,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') {
-    console.warn(`❌ Invalid method: ${req.method}`);
+    const methodErr = `❌ Invalid method: ${req.method}`;
+    console.warn(methodErr);
+    await sendSlackNotification(methodErr);
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   const { address } = req.body;
 
-  // ✅ 주소 유효성 검사 (EVM or Sui)
+  // ✅ 주소 유효성 검사 (EVM 또는 Sui 주소)
   const isValidHex = typeof address === 'string' && /^0x[a-fA-F0-9]{40,64}$/.test(address);
   const isValidSui = typeof address === 'string' && /^[a-f0-9]{64}$/i.test(address);
+
   if (!isValidHex && !isValidSui) {
-    console.warn(`⚠️ Invalid address submitted: ${address}`);
+    const msg = `⚠️ Invalid address submitted: ${address}`;
+    console.warn(msg);
+    await sendSlackNotification(msg);
     return res.status(400).json({ message: 'Invalid wallet address' });
   }
 
@@ -34,26 +39,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     if (claimedSnap.exists) {
-      console.info(`ℹ️ Already claimed: ${address}`);
+      const msg = `ℹ️ Already claimed: ${address}`;
+      console.info(msg);
+      await sendSlackNotification(msg);
       return res.status(200).json({ message: 'Already claimed' });
     }
 
     if (queuedSnap.exists) {
-      console.info(`ℹ️ Already in queue: ${address}`);
+      const msg = `ℹ️ Already in queue: ${address}`;
+      console.info(msg);
+      await sendSlackNotification(msg);
       return res.status(200).json({ message: 'Already queued' });
     }
 
     await queueRef.set({ address, createdAt: Date.now() });
-    console.log(`✅ Queued airdrop address: ${address}`);
+    const successMsg = `✅ Queued airdrop address: ${address}`;
+    console.log(successMsg);
 
     await sendSlackNotification(
       `📥 *New Airdrop Request* 등록됨\n• 🧾 Wallet: \`${address}\`\n• 🌐 [조회링크](https://karenworld-clean.vercel.app/admin/airdrop-log?search=${address})\n• 🕓 ${new Date().toISOString()}`
     );
 
     return res.status(200).json({ message: 'Successfully queued for airdrop' });
+
   } catch (err: any) {
     const errorMessage = err?.message || String(err);
-    console.error(`❌ Error queuing airdrop for ${address}: ${errorMessage}`);
+    const msg = `❌ Error queuing airdrop for ${address}: ${errorMessage}`;
+    console.error(msg);
 
     await sendSlackNotification(
       `❌ *Airdrop Queue Error*\n• 🧾 Wallet: \`${address}\`\n• 💥 Error: \`${errorMessage}\`\n• 🕓 ${new Date().toISOString()}`

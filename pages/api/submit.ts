@@ -15,9 +15,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
 
   const { wallet } = req.body;
-  if (!wallet || typeof wallet !== "string") {
-    return res.status(400).json({ error: "Missing wallet address" });
-  }
+if (!wallet || typeof wallet !== "string") {
+  return res.status(400).json({ error: "Missing wallet address" });
+}
 
     try {
     const db = admindb;  // ✅ 수정 완료
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
 // 🔄 자동 에어드랍 트리거 (절대 경로 fallback 포함)
-const origin = "https://karen-world-clean.vercel.app";
+const origin = "https://karen-world-clean.vercel.app"; // 🔧 절대 경로로 고정
 const response = await fetch(`${origin}/api/airdrop`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -45,7 +45,8 @@ let result: any = null;
 try {
   result = await response.json();
 } catch (err) {
-  console.warn("❌ Failed to parse JSON response:", await response.text());
+  const raw = await response.text();
+  console.warn("❌ Failed to parse JSON response:", raw);
   result = null;
 }
 
