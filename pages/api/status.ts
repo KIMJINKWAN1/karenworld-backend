@@ -12,25 +12,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-   if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+  if (req.method !== "GET") {
+    return res.status(405).json({ success: false, error: "Method Not Allowed" });
   }
 
   try {
     const snapshot = await admindb.collection(COLLECTION_PATH).get();
-    const claimed = snapshot.size;
-    const totalClaimed = claimed * AIRDROP_AMOUNT;
+    const claimedCount = snapshot.size;
+    const totalClaimed = claimedCount * 2000;
     const remaining = MAX_AIRDROP - totalClaimed;
 
     return res.status(200).json({
-      claimed,
-      total: MAX_AIRDROP,
+      success: true,
+      claimedCount,
+      totalClaimed,
       remaining,
+      total: MAX_AIRDROP,
       percent: ((totalClaimed / MAX_AIRDROP) * 100).toFixed(2),
     });
   } catch (err) {
     console.error("❌ Error in /api/status:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 }
 
