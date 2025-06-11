@@ -3,6 +3,7 @@ import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
 const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/queue/queue";
+const ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://karen-world-clean.vercel.app";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // ✅ CORS 설정
@@ -30,12 +31,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await queueRef.set({ wallet, timestamp: Date.now() });
     console.log(`✅ Address submitted to queue: ${wallet}`);
 
-    const origin = req.headers.origin || "https://karen-world-clean.vercel.app";
-    const response = await fetch(`${origin}/api/airdrop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: wallet }),
-    });
+    
+const response = await fetch(`${ORIGIN}/api/airdrop`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ address: wallet }),
+});
 
     let result: any = null;
     try {
