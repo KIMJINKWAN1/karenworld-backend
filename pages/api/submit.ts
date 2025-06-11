@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
-const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/queue/queue";
+const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/queue/queue"; // ✅ 경로 재확인
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // ✅ CORS 설정
@@ -12,33 +12,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") {
-    console.warn(`❌ Invalid method: ${req.method}`);
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const { wallet } = req.body;
+  let wallet: string | undefined;
+  try {
+    wallet = req.body.wallet;
+  } catch (err: any) {
+    console.error("❌ Body parse error:", err);
+    await sendSlackNotification(`❌ *Submit API 오류*\n• 📩 본문 파싱 실패: \`${err.message}\``);
+    return res.status(400).json({ error: "Invalid request body" });
+  }
+
   if (!wallet || typeof wallet !== "string") {
-    const msg = `❗ Missing or invalid wallet: ${wallet}`;
-    console.warn(msg);
-    await sendSlackNotification(`❗ *Submit Error*: ${msg}`);
+    await sendSlackNotification(`⚠️ *지갑 주소 누락 또는 잘못됨*\n• Payload: \`${JSON.stringify(req.body)}\``);
     return res.status(400).json({ error: "Missing wallet address" });
   }
 
   try {
-    const db = admindb;
-    const docRef = db.collection(COLLECTION_PATH).doc(wallet);
-
-    // 🔹 Firestore 기록
+    const docRef = admindb.collection(COLLECTION_PATH).doc(wallet);
     await docRef.set({ wallet, timestamp: Date.now() });
 
-    // 🔔 Slack 알림
-    await sendSlackNotification(
-      `📥 *Airdrop Request Submitted*\n• 🧾 Wallet: \`${wallet}\`\n• 🌐 [조회](https://karenworld-clean.vercel.app/admin/airdrop-log?search=${wallet})\n• 🕓 ${new Date().toISOString()}`
-    );
-
-    // 🔄 자동 에어드랍 트리거
-    const origin = "https://karen-world-clean.vercel.app";
-    const response = await fetch(`${origin}/api/airdrop`, {
+    const response = await fetch(`${req.headers.origin || "https://karen-world-clean.vercel.app"}/api/airdrop`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: wallet }),
@@ -48,24 +43,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       result = await response.json();
     } catch (err) {
-      const errorText = await response.text();
-      console.warn("❌ Failed to parse JSON response:", errorText);
-      await sendSlackNotification(
-        `❌ *Airdrop Response JSON 파싱 실패*\n• Wallet: \`${wallet}\`\n• Response: \n\`\`\`${errorText}\`\`\``
-      );
-      result = null;
+      const fallback = await response.text();
+      console.warn("❌ 응답 JSON 파싱 실패:", fallback);
+      await sendSlackNotification(`❌ *Airdrop 응답 오류*\n• 📩 파싱 실패: \`${fallback}\``);
     }
 
     if (!response.ok || !result) {
-      const errMsg = result?.error ?? "Airdrop execution failed";
       await docRef.set(
-        { wallet, timestamp: Date.now(), error: errMsg },
+        { wallet, timestamp: Date.now(), error: result?.error ?? "Unknown error" },
         { merge: true }
       );
-      await sendSlackNotification(
-        `❌ *Airdrop Execution Failed*\n• Wallet: \`${wallet}\`\n• Error: \`${errMsg}\`\n• Status: ${response.status}`
-      );
-      return res.status(500).json({ error: errMsg });
+
+      await sendSlackNotification(`❌ *Airdrop 실행 실패*\n• 🧾 \`${wallet}\`\n• 오류: ${result?.error || "Unknown error"}`);
+      return res.status(500).json({ error: result?.error ?? "Airdrop execution failed" });
     }
 
     return res.status(200).json({
@@ -75,13 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       digest: result.digest,
     });
   } catch (err: any) {
-    const errMsg = err?.message || String(err);
-    console.error("❌ Submit handler error:", errMsg);
-
-    await sendSlackNotification(
-      `❌ *Submit API Error*\n• Wallet: \`${wallet}\`\n• 💥 Error: \`${errMsg}\`\n• 🕓 ${new Date().toISOString()}`
-    );
-
+    console.error("❌ Submit handler error:", err.message || err);
+    await sendSlackNotification(`❌ *Submit API 예외 발생*\n• 🧾 Wallet: \`${wallet}\`\n• ⚠️ ${err.message}`);
     return res.status(500).json({ error: "Submit failed" });
   }
 }
