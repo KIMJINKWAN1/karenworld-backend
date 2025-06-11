@@ -33,27 +33,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.warn("⚠️ Slack notification failed:", (err as Error).message);
     }
 
-    // 🔄 자동 에어드랍 트리거 (상대 경로 사용)
-    const response = await fetch(`${req.headers.origin || ""}/api/airdrop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet }),
-    });
+// 🔄 자동 에어드랍 트리거 (절대 경로 fallback 포함)
+const origin = "https://karen-world-clean.vercel.app";
+const response = await fetch(`${origin}/api/airdrop`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ wallet }),
+});
 
-    let result: any = null;
-    try {
-      result = await response.json();
-    } catch (err) {
-      console.warn("❌ Failed to parse JSON response:", err);
-    }
+let result: any = null;
+try {
+  result = await response.json();
+} catch (err) {
+  console.warn("❌ Failed to parse JSON response:", await response.text());
+  result = null;
+}
 
-    if (!response.ok || !result) {
-      await docRef.set(
-        { wallet, timestamp: Date.now(), error: result?.error ?? "Unknown error" },
-        { merge: true }
-      );
-      return res.status(500).json({ error: result?.error ?? "Airdrop execution failed" });
-    }
+if (!response.ok || !result) {
+  await docRef.set(
+    { wallet, timestamp: Date.now(), error: result?.error ?? "Unknown error" },
+    { merge: true }
+  );
+  return res.status(500).json({ error: result?.error ?? "Airdrop execution failed" });
+}
 
     return res.status(200).json({
       success: true,
