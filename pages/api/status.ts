@@ -23,13 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const remaining = MAX_AIRDROP - totalClaimed;
 
     return res.status(200).json({
-      success: true,
-      claimedCount,
-      totalClaimed,
-      remaining,
-      total: MAX_AIRDROP,
-      percent: ((totalClaimed / MAX_AIRDROP) * 100).toFixed(2),
-    });
+  success: true,
+  claimedCount,
+  totalClaimed,
+  remaining,
+  percent: ((totalClaimed / MAX_AIRDROP) * 100).toFixed(2),
+});
+
   } catch (err) {
     console.error("❌ Error in /api/status:", err);
     return res.status(500).json({ success: false, error: "Internal Server Error" });
