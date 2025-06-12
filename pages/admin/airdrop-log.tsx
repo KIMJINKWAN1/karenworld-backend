@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Card } from "../../components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Download, RefreshCw, Eye } from "lucide-react";
+import { Badge } from "../../components/ui/badge";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { Switch } from "../../components/ui/switch";
+import { Download, RefreshCw } from "lucide-react";
 
 type AirdropLog = {
   wallet: string;
@@ -31,16 +31,25 @@ export default function AirdropLogPage() {
       .then(setLogs);
   }, []);
 
-const filtered = Array.isArray(logs)
-  ? logs
-      .filter((log) =>
-        log.wallet.toLowerCase().includes(filter.toLowerCase())
-      )
-      .filter((log) => (showOnlyFailed ? log.status === "fail" : true))
-  : [];
+  const filtered = Array.isArray(logs)
+    ? logs
+        .filter((log) =>
+          log.wallet.toLowerCase().includes(filter.toLowerCase())
+        )
+        .filter((log) => (showOnlyFailed ? log.status === "fail" : true))
+    : [];
 
   const downloadCSV = () => {
-    const headers = ["wallet", "status", "digest", "error", "timestamp", "amount", "claimedAt_iso", "note"];
+    const headers = [
+      "wallet",
+      "status",
+      "digest",
+      "error",
+      "timestamp",
+      "amount",
+      "claimedAt_iso",
+      "note",
+    ];
     const rows = logs.map((log) =>
       headers.map((h) => JSON.stringify(log[h as keyof AirdropLog] ?? "")).join(",")
     );
@@ -54,11 +63,15 @@ const filtered = Array.isArray(logs)
     URL.revokeObjectURL(url);
   };
 
+  const successCount = logs.filter((log) => log.status === "success").length;
+  const failCount = logs.filter((log) => log.status === "fail").length;
+  const totalClaimed = logs.reduce((sum, log) => sum + (log.amount || 0), 0);
+
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">🎯 에어드랍 로그</h1>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Input
           placeholder="지갑 주소 필터링..."
           value={filter}
@@ -80,6 +93,10 @@ const filtered = Array.isArray(logs)
           <Download className="w-4 h-4 mr-2" />
           CSV 다운로드
         </Button>
+      </div>
+
+      <div className="text-sm text-gray-600">
+        ✅ 성공: {successCount}건 ｜ ❌ 실패: {failCount}건 ｜ 💰 총 지급 수량: {totalClaimed.toLocaleString()} $KAREN
       </div>
 
       <ScrollArea className="h-[600px] rounded-lg border">
