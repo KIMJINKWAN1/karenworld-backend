@@ -36,19 +36,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 🌐 /api/airdrop 호출
     const response = await fetch(`${ORIGIN}/api/airdrop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet }),
-    });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ wallet }),
+});
 
+console.log("✅ Reached airdrop call");
+console.log("✅ response.ok:", response.ok);
+const text = await response.text();
+console.log("✅ response.text:", text); // 🔥 이걸로 응답 내용 추적 가능
 
     // 📦 응답 파싱
-    let result;
+let result: any;
 try {
-  result = await response.json();
+  result = JSON.parse(text);
 } catch (e) {
-  const text = await response.text();
-  console.warn("❌ JSON 파싱 실패, 원본 응답:", text);
+  console.warn("❌ Failed to parse JSON from /airdrop, raw text:", text);
   result = null;
 }
 
