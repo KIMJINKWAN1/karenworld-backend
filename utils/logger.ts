@@ -2,6 +2,8 @@ import { getFirestore } from "firebase-admin/firestore";
 import { admindb } from "@/firebase/admin";
 import { sendSlackNotification } from "@/utils/slack";
 
+const db = getFirestore();
+
 export const logger = {
   log: (...args: any[]) => {
     console.log("[LOG]", ...args);
