@@ -41,15 +41,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: JSON.stringify({ wallet }),
     });
 
+
     // 📦 응답 파싱
-    let result: any;
-    try {
-      result = await response.json();
-    } catch (e) {
-      const text = await response.text();
-      console.warn("❌ JSON 파싱 실패, 원본 응답:", text);
-      result = null;
-    }
+    let result;
+try {
+  result = await response.json();
+} catch (e) {
+  const text = await response.text();
+  console.warn("❌ JSON 파싱 실패, 원본 응답:", text);
+  result = null;
+}
 
     // ❌ 에러 응답 처리
     if (!response.ok || !result) {

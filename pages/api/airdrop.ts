@@ -14,8 +14,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  console.log("✅ Reached airdrop call");
+
   const { wallet } = req.body;
   console.log("📨 /airdrop req.body:", req.body);
+
+  if (!wallet) {
+    console.error("❌ Missing wallet in /airdrop");
+    return res.status(400).json({ error: "Missing wallet" });
+  }
 
   // ✅ 주소 유효성 검사 (EVM or Sui)
   const isValidHex = typeof wallet === 'string' && /^0x[a-fA-F0-9]{40,64}$/.test(wallet);
@@ -51,7 +58,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `📥 *New Airdrop Request* 등록됨\n• 🧾 Wallet: \`${wallet}\`\n• 🌐 [조회링크](https://karenworld-clean.vercel.app/admin/airdrop-log?search=${wallet})\n• 🕓 ${new Date().toISOString()}`
     );
 
-    return res.status(200).json({ message: 'Successfully queued for airdrop' });
+    const responseBody = { message: 'Successfully queued for airdrop' };
+    console.log("✅ Response ok:", true);
+    console.log("✅ Response body:", responseBody);
+
+    return res.status(200).json(responseBody);
   } catch (err: any) {
     const errorMessage = err?.message || String(err);
     console.error(`❌ Error queuing airdrop for ${wallet}: ${errorMessage}`);
@@ -60,9 +71,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `❌ *Airdrop Queue Error*\n• 🧾 Wallet: \`${wallet}\`\n• 💥 Error: \`${errorMessage}\`\n• 🕓 ${new Date().toISOString()}`
     );
 
-    return res.status(500).json({ message: 'Server error. Try again later.' });
+    const errorResponse = { message: 'Server error. Try again later.' };
+    console.log("✅ Response ok:", false);
+    console.log("✅ Response body:", errorResponse);
+
+    return res.status(500).json(errorResponse);
   }
 }
+
 
 
 
