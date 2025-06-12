@@ -15,6 +15,9 @@ interface AirdropLog {
   error?: string;
   timestamp: number;
   slackNotified?: boolean;
+  claimedAt_iso?: string;
+  amount?: number;
+  note?: string;
 }
 
 export default function AirdropLogPage() {
@@ -188,6 +191,9 @@ export default function AirdropLogPage() {
                 </div>
                 {log.digest && <div className="text-xs text-muted-foreground truncate">🔗 Tx: {log.digest}</div>}
                 {log.error && <div className="text-xs text-red-500 truncate">⚠️ Error: {log.error}</div>}
+                {log.amount && <div className="text-xs text-gray-600">💸 수량: {log.amount} $KAREN</div>}
+                {log.note && <div className="text-xs text-gray-600">📝 노트: {log.note}</div>}
+                {log.claimedAt_iso && <div className="text-xs text-gray-500">📅 ISO: {log.claimedAt_iso}</div>}
                 <div className="text-xs text-gray-500">🕒 {new Date(log.timestamp).toLocaleString()}</div>
                 {log.status === "error" && (
                   <Button
@@ -222,7 +228,15 @@ export default function AirdropLogPage() {
         ))}
       </div>
 
-      {selectedLog && (
+      {selectedLog.amount !== undefined && (
+        <div className="text-sm">💸 수량: {selectedLog.amount} $KAREN</div>
+)}
+{selectedLog.claimedAt_iso && (
+  <div className="text-sm">📅 ISO 시간: {selectedLog.claimedAt_iso}</div>
+)}
+{selectedLog.note && (
+  <div className="text-sm">📝 노트: {selectedLog.note}</div>
+)}
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-[400px] max-w-full space-y-4">
             <h2 className="text-lg font-semibold">상세 정보</h2>
@@ -236,7 +250,6 @@ export default function AirdropLogPage() {
             </Button>
           </div>
         </div>
-      )}
     </div>
   );
 }
