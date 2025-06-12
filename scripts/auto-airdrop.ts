@@ -8,7 +8,7 @@ import {
   listUnclaimedRecipients,
   checkRecipientClaimStatus,
   markClaimed,
-} from '@/firebase/admin';
+} from '../firebase/admin';
 import { sendSlackNotification } from '@/utils/slack';
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
