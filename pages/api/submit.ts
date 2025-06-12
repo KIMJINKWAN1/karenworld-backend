@@ -18,15 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Missing wallet address" });
   }
 
-  try {
-    const queueRef = admindb.collection("airdrop/queue/queue").doc(wallet);
-    await queueRef.set({ wallet, timestamp: Date.now() });
-    console.log(`✅ Address submitted to queue: ${wallet}`);
-
-    const result = await handleAirdrop(wallet);
+ try {
+    const result = await handleAirdrop(wallet); // ✅ Firestore + Slack 모두 내부 처리
     return res.status(200).json({
       success: true,
-      message: "Airdrop handled successfully",
+      message: result.message,
     });
   } catch (err: any) {
     const errorMessage = err?.message || "Unknown error";
