@@ -50,16 +50,5 @@ export async function handleAirdrop(wallet: string) {
     ].join('\n')
   );
 
-  await claimsRef.set({
-    address: wallet,
-    claimedAt: Date.now(),
-    claimedAt_iso: now,
-    note: [
-      '📥 Submit API로 등록된 자동 에어드랍 기록입니다.',
-      '🔐 지갑 주소는 Sui Mainnet 기준입니다.',
-      '📦 프로젝트: KAREN_WORLD',
-    ].join('\n'),
-  });
-
   return { message: 'Successfully queued for airdrop' };
 }

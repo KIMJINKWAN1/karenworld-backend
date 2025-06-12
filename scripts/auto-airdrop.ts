@@ -3,13 +3,15 @@ import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { fromB64 } from '@mysten/bcs';
+import { admindb } from '../firebase/admin';
 
 import {
   listUnclaimedRecipients,
   checkRecipientClaimStatus,
   markClaimed,
-} from '../firebase/admin';
-import { sendSlackNotification } from '@/utils/slack';
+} from '../firebase/admin'; // ✅ 상대 경로로 수정
+
+import { sendSlackNotification } from '../utils/slack'; // ✅ 상대 경로로 수정
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
@@ -21,6 +23,7 @@ const NETWORK = (process.env.SUI_NETWORK || "mainnet") as
   | "localnet";
 
 if (!PRIVATE_KEY) throw new Error('❌ .env에 PRIVATE_KEY 누락됨');
+
 
 // ✅ keypair 초기화
 const keypair = Ed25519Keypair.fromSecretKey(fromB64(PRIVATE_KEY));
@@ -95,21 +98,39 @@ async function runAirdrop() {
       console.log(`✅ Claimed and logged: ${recipient}`);
       console.log(`✅ Success: ${recipient} (${result.digest})`);
 
-      await sendSlackNotification([
-  "🎉 *에어드랍 전송 성공!*",
-  `• 🧾 Wallet: \`${recipient}\``,
-  `• 💰 수량: \`${AIRDROP_AMOUNT}\` $KAREN`,
-  `• 🧾 트랜잭션: \`${result.digest}\``,
-  `• 🌐 [🔍 관리자 조회 링크](https://karenworld-clean.vercel.app/admin/airdrop-log?search=${recipient})`,
-  `• 🕓 완료 시간: \`${new Date().toISOString()}\``
-].join("\n"));
+      const claimsRef = admindb
+      .collection('airdrop')
+      .doc('prod')
+      .collection('claims')
+      .doc(recipient);
 
+      await claimsRef.set({
+      address: recipient, // ✅ 수정
+      claimedAt: Date.now(),
+      claimedAt_iso: new Date().toISOString(),
+      amount: 2000,
+      txDigest: result.digest, // ✅ 수정
+      note: [
+      '🚀 실제 전송 완료된 자동 에어드랍 기록입니다.',
+      '🔐 지갑 주소는 Sui Mainnet 기준입니다.',
+      '📦 프로젝트: KAREN_WORLD',
+      ].join('\n'),
+      });
+
+      await sendSlackNotification([
+        "🎉 *에어드랍 완료됨!*",
+        `• 🧾 Wallet: \`${recipient}\``,
+        `• 💸 수량: \`${AIRDROP_AMOUNT} $KAREN\``,
+        `• 🔗 TxDigest: \`${result.digest}\``,
+        `• 🕓 시간: \`${new Date().toISOString()}\``,
+      ].join('\n'));
     } catch (err: any) {
-      const message = err?.message || String(err);
-      console.error(`❌ Failed for ${recipient}:`, message);
-      await sendSlackNotification(
-        `❌ *Airdrop Failed*\n• 🧾 Wallet: \`${recipient}\`\n• 💥 Error: \`${message}\``
-      );
+      console.error(`❌ 에러 발생: ${recipient}`, err?.message);
+      await sendSlackNotification([
+        "❌ *에어드랍 실패!*",
+        `• 🧾 Wallet: \`${recipient}\``,
+        `• ❗ 오류: \`${err?.message}\``
+      ].join('\n'));
     }
   }
 }
@@ -124,19 +145,3 @@ runAirdrop()
     console.error('❌ Airdrop script failed:', e);
     process.exit(1);
   });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
