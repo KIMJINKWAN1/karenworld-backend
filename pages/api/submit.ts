@@ -66,16 +66,17 @@ try {
       amount: result.amount ?? 2000,
       digest: result.digest,
     });
-  } catch (err: any) {
-    const errorMessage = err?.message || String(err);
-    console.error("❌ Submit handler error:", errorMessage);
+} catch (err: any) {
+  const errorMessage = err?.message || JSON.stringify(err) || "Unknown error";
 
-    await sendSlackNotification(
-      `❌ *Submit API Error*\n• 🧾 \`${wallet}\`\n• 💥 Error: \`${errorMessage}\``
-    );
+  console.error("❌ Submit handler error:", err); // ✅ 전체 에러 로그 남기기
 
-    return res.status(500).json({ error: "Submit failed" });
-  }
+  await sendSlackNotification(
+    `❌ *Submit Handler Error*\n• 🧾 Wallet: \`${wallet}\`\n• 💥 Error: \`${errorMessage}\`\n• 🕓 ${new Date().toISOString()}`
+  );
+
+  return res.status(500).json({ error: errorMessage }); // ✅ 반드시 반환
+}
 }
 
 
