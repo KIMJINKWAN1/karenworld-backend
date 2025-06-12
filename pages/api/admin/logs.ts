@@ -1,22 +1,41 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import { admindb } from "@/firebase/admin";
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
+const db = getFirestore();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const snapshot = await admindb
-      .collection("airdrop/logs")
-      .orderBy("timestamp", "desc")
-      .limit(100)
-      .get();
+    const snapshot = await db.collection('airdrop').doc('claims').collection('claims').get();
 
-    const logs = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const logs = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        wallet: data.wallet,
+        status: 'success',
+        digest: data.txDigest || '',
+        timestamp: data.claimedAt || 0,
+        claimedAt_iso: data.claimedAt_iso || '',
+        amount: data.amount || 0,
+        note: data.note || '',
+        slackNotified: true,
+      };
+    });
 
     res.status(200).json({ logs });
-  } catch (error: any) {
-    console.error("❌ Error fetching logs:", error);
-    res.status(500).json({ error: "Failed to fetch airdrop logs." });
+  } catch (err: any) {
+    console.error('Error loading Firestore logs:', err.message);
+    res.status(500).json({ error: err.message });
   }
 }
