@@ -20,16 +20,32 @@ type AirdropLog = {
 };
 
 export default function AirdropLogPage() {
-  const [logs, setLogs] = useState<AirdropLog[]>([]);
+  const [logs, setLogs] = useState<any[]>([]); // 초기 상태는 배열로 유지해야 함
   const [filter, setFilter] = useState("");
   const [showOnlyFailed, setShowOnlyFailed] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AirdropLog | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/logs")
-      .then((res) => res.json())
-      .then(setLogs);
-  }, []);
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/logs');
+      const data = await res.json();
+
+      // 방어코딩 추가: 배열인지 체크 후 setLogs
+      if (Array.isArray(data)) {
+        setLogs(data);
+      } else {
+        console.error("❌ logs 응답이 배열이 아님:", data);
+        setLogs([]);
+      }
+    } catch (err) {
+      console.error("❌ 로그 fetch 에러:", err);
+      setLogs([]);
+    }
+  };
+
+  fetchLogs();
+}, []);
 
   const filtered = Array.isArray(logs)
     ? logs
