@@ -8,8 +8,8 @@ import {
   listUnclaimedRecipients,
   checkRecipientClaimStatus,
   markClaimed,
-} from '../firebase/admin';
-import { sendSlackNotification } from '../utils/slack';
+} from '@/firebase/admin';
+import { sendSlackNotification } from '@/utils/slack';
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const COIN_OBJECT_ID = process.env.KAREN_COIN_OBJECT_ID!;
@@ -95,9 +95,15 @@ async function runAirdrop() {
       console.log(`✅ Claimed and logged: ${recipient}`);
       console.log(`✅ Success: ${recipient} (${result.digest})`);
 
-      await sendSlackNotification(
-        `🎯 *Airdrop Success*\n• 🧾 Wallet: \`${recipient}\`\n• 🔗 Tx: \`${result.digest}\`\n• 💰 Amount: ${AIRDROP_AMOUNT} KAREN`
-      );
+      await sendSlackNotification([
+  "🎉 *에어드랍 전송 성공!*",
+  `• 🧾 Wallet: \`${recipient}\``,
+  `• 💰 수량: \`${AIRDROP_AMOUNT}\` $KAREN`,
+  `• 🧾 트랜잭션: \`${result.digest}\``,
+  `• 🌐 [🔍 관리자 조회 링크](https://karenworld-clean.vercel.app/admin/airdrop-log?search=${recipient})`,
+  `• 🕓 완료 시간: \`${new Date().toISOString()}\``
+].join("\n"));
+
     } catch (err: any) {
       const message = err?.message || String(err);
       console.error(`❌ Failed for ${recipient}:`, message);

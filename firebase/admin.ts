@@ -22,64 +22,48 @@ if (!admin.apps.length) {
 export const db = admin.firestore();
 export const admindb = db;
 
-/**
- * 수령 여부 확인 (중복 방지)
- */
-export async function checkRecipientClaimStatus(address: string) {
-  const doc = await db.doc(`${process.env.AIRDROP_COLLECTION_PATH}/${address}`).get();
-  return doc.exists;
-}
+// ✅ 아직 에어드랍 처리되지 않은 대기열 주소 리스트 조회
+export const listUnclaimedRecipients = async (): Promise<string[]> => {
+  const snapshot = await db
+    .collection('airdrop')
+    .doc('claims')
+    .collection('queue')
+    .get();
+  return snapshot.docs.map((doc) => doc.id);
+};
 
-/**
- * 수령 기록 저장
- */
-export async function markClaimed(address: string, txDigest: string, amount?: number) {
-  await db.doc(`${process.env.AIRDROP_COLLECTION_PATH}/${address}`).set({
-    address,
+// ✅ 이미 에어드랍 처리되었는지 확인
+export const checkRecipientClaimStatus = async (wallet: string): Promise<boolean> => {
+  const doc = await db
+    .collection('airdrop')
+    .doc('claims')
+    .collection('claims')
+    .doc(wallet)
+    .get();
+  return doc.exists;
+};
+
+// ✅ 에어드랍 완료로 기록 및 대기열 제거
+export const markClaimed = async (wallet: string, txDigest: string, amount: number) => {
+  const claimsRef = db.collection('airdrop').doc('prod').collection('claims').doc(wallet);
+  await claimsRef.set({
+    wallet,
     txDigest,
     amount,
     claimedAt: Date.now(),
+    claimedAt_iso: new Date().toISOString(),
+    note: [
+      '📥 수동 처리된 자동 에어드랍 기록입니다.',
+      '🔐 지갑 주소는 Sui Mainnet 기준입니다.',
+      '📦 프로젝트: KAREN_WORLD',
+    ].join('\n'),
   });
-}
 
-/**
- * 중복 수령 방지용 리스트
- */
-export async function listUnclaimedRecipients(): Promise<string[]> {
-  const snapshot = await admindb
+  // 대기열에서 제거
+  await db
     .collection('airdrop')
-    .doc('queue')
+    .doc('claims')
     .collection('queue')
-    .get();
-
-  const list: string[] = [];
-  snapshot.forEach((doc) => {
-    if (doc.exists) list.push(doc.id);
-  });
-
-  return list;
-}
-
-/**
- * Firestore에 수령 대상 추가
- */
-export async function addRecipient(address: string, amount: number) {
-  const ref = admindb
-    .collection('airdrop')
-    .doc('recipients')
-    .collection('list')
-    .doc(address);
-
-  await ref.set({
-    airdropAmount: Math.floor(amount),
-    addedAt: Date.now(),
-  });
-}
-
-
-
-
-
-
-
-
+    .doc(wallet)
+    .delete();
+};
