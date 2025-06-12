@@ -31,11 +31,13 @@ export default function AirdropLogPage() {
       .then(setLogs);
   }, []);
 
-  const filtered = logs
-    .filter((log) =>
-      log.wallet.toLowerCase().includes(filter.toLowerCase())
-    )
-    .filter((log) => (showOnlyFailed ? log.status === "fail" : true));
+const filtered = Array.isArray(logs)
+  ? logs
+      .filter((log) =>
+        log.wallet.toLowerCase().includes(filter.toLowerCase())
+      )
+      .filter((log) => (showOnlyFailed ? log.status === "fail" : true))
+  : [];
 
   const downloadCSV = () => {
     const headers = ["wallet", "status", "digest", "error", "timestamp", "amount", "claimedAt_iso", "note"];
