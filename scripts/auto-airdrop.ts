@@ -54,6 +54,24 @@ async function runAirdrop() {
   const unclaimed = await listUnclaimedRecipients();
   console.log(`🔍 Unclaimed recipients (${unclaimed.length}):`, unclaimed);
 
+// 🔐 총량 제한 체크 (예: 2천만 개)
+  const MAX_TOTAL = 20_000_000;
+  const metaRef = admindb.collection('airdrop').doc('meta');
+  const metaSnap = await metaRef.get();
+  const totalClaimed = metaSnap.exists ? metaSnap.data().totalClaimed || 0 : 0;
+
+  const projected = totalClaimed + (unclaimed.length * Number(AIRDROP_AMOUNT));
+  if (projected > MAX_TOTAL) {
+    await sendSlackNotification([
+      "🚫 *에어드랍 한도 초과 시도 감지됨!*",
+      `• 총 지급 예정 수량: ${projected} / ${MAX_TOTAL}`,
+      `• 📉 남은 수량: ${MAX_TOTAL - totalClaimed}`,
+      `• 🕓 시간: ${new Date().toISOString()}`
+    ].join('\n'));
+    console.log("🚫 에어드랍 수량 한도 초과로 종료됨");
+    return;
+  }
+
   if (unclaimed.length === 0) {
   console.log('⚠️ All addresses have already claimed the airdrop.');
   return;
