@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { admindb } from "@/firebase/admin";
 
 // 환경변수
-const COLLECTION_PATH = process.env.AIRDROP_COLLECTION_PATH || "airdrop/prod/claims";
+const COLLECTION_PATH = process.env.AIRDROP_CLAIMS_PATH || "airdrop/prod/claims";
 const MAX_AIRDROP = parseInt(process.env.MAX_AIRDROP || "20000000");
 const AIRDROP_AMOUNT = parseInt(process.env.AIRDROP_AMOUNT || "2000");
 
